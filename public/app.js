@@ -167,7 +167,7 @@ async function loadUrls() {
         if (!res.ok) throw new Error('Fichier introuvable. Le bot n\'a peut-être pas encore généré la liste.');
         
         const text = await res.text();
-        const urls = text.split('\\n').map(u => u.trim()).filter(u => u);
+        const urls = text.split('\n').map(u => u.trim()).filter(u => u);
 
         if (urls.length === 0) {
             urlListContainer.textContent = "Le fichier est vide.";

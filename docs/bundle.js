@@ -1833,7 +1833,7 @@
       const res = await fetch("urls-trouvees.txt?v=" + (/* @__PURE__ */ new Date()).getTime());
       if (!res.ok) throw new Error("Fichier introuvable. Le bot n'a peut-\xEAtre pas encore g\xE9n\xE9r\xE9 la liste.");
       const text = await res.text();
-      const urls = text.split("\\n").map((u) => u.trim()).filter((u) => u);
+      const urls = text.split("\n").map((u) => u.trim()).filter((u) => u);
       if (urls.length === 0) {
         urlListContainer.textContent = "Le fichier est vide.";
         return;
