@@ -1,0 +1,173 @@
+[
+  {
+    "url": "http://secure-bank.example.com",
+    "finalUrl": "https://secure-bank.example.com",
+    "status": 200,
+    "headers": {
+      "server": "nginx",
+      "content-type": "text/html; charset=UTF-8",
+      "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+      "content-security-policy": "default-src 'self'; script-src 'self' https://trusted.example.com;",
+      "x-frame-options": "DENY",
+      "x-content-type-options": "nosniff"
+    },
+    "setCookies": [
+      {
+        "name": "session_token",
+        "value": "fictional-token-12345",
+        "domain": "secure-bank.example.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "Strict"
+      }
+    ],
+    "tls": {
+      "protocol": "TLSv1.3",
+      "issuer": "DigiCert Global Root CA",
+      "validFrom": "2025-01-01T00:00:00Z",
+      "validTo": "2026-12-31T23:59:59Z"
+    },
+    "thirdPartyDomains": [
+      "trusted.example.com"
+    ],
+    "thirdPartyScripts": [
+      "https://trusted.example.com/analytics.js"
+    ],
+    "technologies": [
+      "React",
+      "Nginx"
+    ],
+    "findings": [],
+    "metadata": {
+      "auditDate": "2026-06-24T10:00:00Z",
+      "auditor": "AutoScanner V2"
+    }
+  },
+  {
+    "url": "https://blog.example.org",
+    "finalUrl": "https://blog.example.org",
+    "status": 200,
+    "headers": {
+      "server": "Apache",
+      "content-type": "text/html; charset=UTF-8",
+      "x-frame-options": "SAMEORIGIN"
+    },
+    "setCookies": [
+      {
+        "name": "wp_settings",
+        "value": "time=1234567890",
+        "domain": "blog.example.org",
+        "path": "/",
+        "secure": false,
+        "httpOnly": true
+      }
+    ],
+    "tls": {
+      "protocol": "TLSv1.2",
+      "issuer": "Let's Encrypt Authority X3",
+      "validFrom": "2026-05-15T00:00:00Z",
+      "validTo": "2026-08-15T00:00:00Z"
+    },
+    "thirdPartyDomains": [
+      "fonts.googleapis.com",
+      "www.google-analytics.com",
+      "cdn.jsdelivr.net"
+    ],
+    "thirdPartyScripts": [
+      "https://www.google-analytics.com/analytics.js",
+      "https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+    ],
+    "technologies": [
+      "WordPress",
+      "PHP",
+      "Apache"
+    ],
+    "findings": [
+      {
+        "type": "Missing Header",
+        "severity": "Low",
+        "description": "L'en-tête Strict-Transport-Security (HSTS) n'est pas activé."
+      },
+      {
+        "type": "Missing Header",
+        "severity": "Low",
+        "description": "L'en-tête Content-Security-Policy (CSP) est manquant."
+      }
+    ],
+    "metadata": {
+      "auditDate": "2026-06-24T10:05:00Z",
+      "auditor": "AutoScanner V2"
+    }
+  },
+  {
+    "url": "http://legacy-shop.example.net",
+    "finalUrl": "http://legacy-shop.example.net",
+    "status": 200,
+    "headers": {
+      "server": "Apache/2.2.14 (Ubuntu)",
+      "x-powered-by": "PHP/5.3.2",
+      "content-type": "text/html"
+    },
+    "setCookies": [
+      {
+        "name": "PHPSESSID",
+        "value": "a1b2c3d4e5f6g7h8i9j0",
+        "domain": "legacy-shop.example.net",
+        "path": "/",
+        "secure": false,
+        "httpOnly": false
+      },
+      {
+        "name": "user_tracking",
+        "value": "guest_123",
+        "domain": "legacy-shop.example.net",
+        "path": "/",
+        "secure": false,
+        "httpOnly": false
+      }
+    ],
+    "tls": null,
+    "thirdPartyDomains": [
+      "ajax.googleapis.com",
+      "ads.example-ad-network.com",
+      "tracker.sketchy-site.com"
+    ],
+    "thirdPartyScripts": [
+      "http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js",
+      "http://ads.example-ad-network.com/banner.js",
+      "http://tracker.sketchy-site.com/track.js"
+    ],
+    "technologies": [
+      "PHP 5.3.2",
+      "Apache 2.2.14",
+      "jQuery 1.4.2"
+    ],
+    "findings": [
+      {
+        "type": "Cleartext Protocol",
+        "severity": "High",
+        "description": "Le site est servi via HTTP, exposant les données à l'interception."
+      },
+      {
+        "type": "Information Disclosure",
+        "severity": "Medium",
+        "description": "Les en-têtes Server et X-Powered-By exposent des versions obsolètes de logiciels."
+      },
+      {
+        "type": "Insecure Cookie",
+        "severity": "High",
+        "description": "Le cookie de session PHPSESSID n'a ni le flag Secure ni le flag HttpOnly."
+      },
+      {
+        "type": "Missing Headers",
+        "severity": "Medium",
+        "description": "Les en-têtes de sécurité (HSTS, CSP, X-Frame-Options) sont absents."
+      }
+    ],
+    "metadata": {
+      "auditDate": "2026-06-24T10:10:00Z",
+      "auditor": "AutoScanner V2"
+    }
+  }
+]

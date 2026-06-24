@@ -1,0 +1,20 @@
+{
+  "name": "offline-security-audit-bot",
+  "version": "1.0.0",
+  "description": "Assistant conversationnel offline pour le traitement de données d'audit de sécurité web.",
+  "main": "bot.js",
+  "scripts": {
+    "bot": "node bot.js",
+    "audit": "node security-audit.js",
+    "test": "node test.js && node test-import.js"
+  },
+  "keywords": [
+    "security",
+    "audit",
+    "offline",
+    "bot",
+    "cli"
+  ],
+  "author": "",
+  "license": "ISC"
+}
