@@ -1,0 +1,33 @@
+name: Expéditeur de fichier (Webhook)
+
+on:
+  push:
+    paths:
+      - 'urls-trouvees.txt' # Se déclenche uniquement quand ce fichier est modifié/créé
+
+jobs:
+  send-to-destination:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v3
+
+      - name: Envoyer le fichier vers votre destination
+        env:
+          # Le lien de destination doit être configuré dans vos secrets GitHub
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "Erreur : L'URL de destination n'est pas configurée."
+            echo "Veuillez créer un secret nommé WEBHOOK_URL dans les paramètres de votre dépôt (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          
+          echo "Envoi du fichier urls-trouvees.txt vers la destination configurée..."
+          
+          # Envoi standard du fichier via une requête HTTP POST
+          curl -X POST "$WEBHOOK_URL" \
+            -F "file=@urls-trouvees.txt" \
+            -H "Content-Type: multipart/form-data"
+            
+          echo "✅ Fichier expédié !"
