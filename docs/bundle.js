@@ -1741,6 +1741,16 @@
   var restartBtn = document.getElementById("restart-btn");
   var errorMessage = document.getElementById("error-message");
   var currentHtmlReport = null;
+  window.addEventListener("ShowLocalsecEmail", (e) => {
+    tabBtns.forEach((b) => b.classList.remove("active"));
+    tabContents.forEach((c) => c.classList.add("hidden"));
+    const auditTabBtn = document.querySelector('[data-tab="audit-tab"]');
+    if (auditTabBtn) auditTabBtn.classList.add("active");
+    document.getElementById("audit-tab").classList.remove("hidden");
+    dropZone.classList.add("hidden");
+    errorCard.classList.add("hidden");
+    renderSalesEmailView(e.detail);
+  });
   dropZone.addEventListener("click", () => fileInput.click());
   dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();

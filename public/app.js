@@ -24,6 +24,21 @@ const errorMessage = document.getElementById('error-message');
 
 let currentHtmlReport = null;
 
+// --- Écoute des événements venant de l'extension Chrome ---
+window.addEventListener('ShowLocalsecEmail', (e) => {
+    // Si on est dans un autre onglet, on bascule sur l'onglet principal pour l'affichage
+    tabBtns.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(c => c.classList.add('hidden'));
+    const auditTabBtn = document.querySelector('[data-tab="audit-tab"]');
+    if (auditTabBtn) auditTabBtn.classList.add('active');
+    document.getElementById('audit-tab').classList.remove('hidden');
+
+    dropZone.classList.add('hidden');
+    errorCard.classList.add('hidden');
+    
+    renderSalesEmailView(e.detail);
+});
+
 // Drag & Drop
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
