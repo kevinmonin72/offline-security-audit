@@ -84,6 +84,36 @@ header p { color: var(--text-muted); margin-bottom: 30px; line-height: 1.5; }
 .drop-content h2 { font-size: 1.25rem; margin-bottom: 8px; }
 .drop-content p { color: var(--text-muted); font-size: 0.9rem; }
 
+.instructions {
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: left;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+.instructions h3 {
+    color: var(--text-main);
+    font-size: 1rem;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.instructions ol {
+    padding-left: 20px;
+    line-height: 1.6;
+}
+.instructions li {
+    margin-bottom: 6px;
+}
+.instructions code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--primary);
+}
+
 .hidden { display: none !important; }
 
 #loading { padding: 40px; }
