@@ -4,6 +4,8 @@
   "description": "Assistant conversationnel offline pour le traitement de données d'audit de sécurité web.",
   "main": "bot.js",
   "scripts": {
+    "start": "node server.js",
+    "build": "npx esbuild public/app.js --bundle --outfile=public/bundle.js && cp -R public/* docs/ && echo 'Build réussi. Le dossier docs/ est prêt pour GitHub Pages.'",
     "bot": "node bot.js",
     "audit": "node security-audit.js",
     "test": "node test.js && node test-import.js"
