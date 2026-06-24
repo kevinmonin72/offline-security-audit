@@ -23,8 +23,10 @@ jobs:
         # Remplacez l'URL par le domaine racine que vous souhaitez explorer
         run: node url-scraper.js "https://example.com"
 
-      - name: Sauvegarder les résultats dans les artifacts GitHub
-        uses: actions/upload-artifact@v3
-        with:
-          name: liste-urls
-          path: urls-trouvees.txt
+      - name: Sauvegarder le fichier texte directement dans le cloud (Dépôt GitHub)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add urls-trouvees.txt
+          git commit -m "🤖 Mise à jour automatique des URLs" || echo "Aucun changement détecté"
+          git push
