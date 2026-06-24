@@ -20,15 +20,21 @@ jobs:
           node-version: '18'
 
       - name: Lancer le bot de recensement
-        # Remplacez l'URL par le domaine racine que vous souhaitez explorer
         run: node url-scraper.js "https://example.com"
 
-      - name: Sauvegarder le fichier texte directement dans le cloud (Dépôt GitHub)
+      - name: Cloner le dépôt de l'extension
+        uses: actions/checkout@v3
+        with:
+          repository: 'kevinmonin72/localsec-extension'
+          path: 'extension-repo'
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Envoyer le fichier vers le dépôt de l'extension
         run: |
+          cp urls-trouvees.txt extension-repo/urls-trouvees.txt
+          cd extension-repo
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
-          # On déplace le fichier dans le dossier docs/ pour qu'il soit accessible via GitHub Pages
-          mv urls-trouvees.txt docs/urls-trouvees.txt
-          git add docs/urls-trouvees.txt
+          git add urls-trouvees.txt
           git commit -m "🤖 Mise à jour automatique des URLs" || echo "Aucun changement détecté"
           git push
