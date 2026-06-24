@@ -53,6 +53,14 @@ function runAnalysisLocally(content) {
 
     setTimeout(() => {
         try {
+            let parsedContent;
+            try { parsedContent = JSON.parse(content); } catch(e){}
+            
+            if (parsedContent && parsedContent.isLocalsecAudit) {
+                renderSalesEmailView(parsedContent);
+                return;
+            }
+
             const normalizedData = importEvidenceString(content);
             let allFindings = [];
             allFindings.push(...analyzeHeaders(normalizedData.headers));
@@ -114,6 +122,84 @@ function showError(msg) {
     dropZone.classList.remove('hidden');
 }
 
+function renderSalesEmailView(data) {
+    loading.classList.add('hidden');
+    resultCard.classList.remove('hidden');
+    
+    // Hide default download button for email view
+    downloadBtn.style.display = 'none';
+
+    let color = '#3b82f6';
+    if (data.grade === 'A') color = '#22c55e';
+    else if (data.grade === 'B') color = '#eab308';
+    else if (data.grade === 'C') color = '#f97316';
+    else color = '#ef4444';
+
+    scoreBadge.textContent = data.grade;
+    scoreBadge.style.backgroundColor = color;
+    scoreBadge.style.boxShadow = `0 0 20px ${color}80`;
+
+    // Génération du pitch email
+    const criticals = data.findings.filter(f => f.severity === 'critical' || f.severity === 'high');
+    const hasSeo = data.findings.some(f => f.tags && f.tags.includes('seo'));
+    const hasPrivacy = data.findings.some(f => f.category === 'Cookies Security' && f.severity === 'high');
+
+    let painPoints = "";
+    if (criticals.length > 0) {
+        painPoints += `<li>⚠️ **Vulnérabilités critiques détectées** (${criticals.length} problème(s) identifié(s) pouvant compromettre vos données)</li>`;
+    }
+    if (hasSeo) {
+        painPoints += `<li>📉 **Pénalité SEO potentielle** (Pratiques de référencement détectées pouvant vous faire bannir de Google)</li>`;
+    }
+    if (hasPrivacy) {
+        painPoints += `<li>⚖️ **Risque RGPD** (Vos cookies exposent les données de vos utilisateurs)</li>`;
+    }
+    if (painPoints === "") {
+        painPoints = `<li>🔍 **Améliorations de durcissement requises** pour correspondre aux standards 2026.</li>`;
+    }
+
+    const emailTemplate = `
+Objet : Faille de sécurité et risque de pénalité détectés sur ${new URL(data.siteUrl).hostname}
+
+Bonjour,
+
+En naviguant sur votre site internet (${new URL(data.siteUrl).hostname}), j'ai remarqué quelques problèmes techniques qui exposent actuellement vos utilisateurs et votre activité.
+
+J'ai fait tourner un rapide audit de sécurité externe et votre site obtient la note de **${data.score}/100 (Grade ${data.grade})**.
+
+Voici les risques principaux actuellement visibles publiquement sur votre code :
+<ul>
+${painPoints}
+</ul>
+
+Ces problèmes peuvent non seulement faire fuiter les données de vos clients, mais aussi impacter lourdement votre référencement naturel.
+
+Nous accompagnons les entreprises dans la sécurisation et la mise aux normes de leur architecture web. Seriez-vous disponible mardi prochain pour un échange de 10 minutes afin que je vous montre les détails techniques ?
+
+Cordialement,
+
+*Généré par LocalSec Audit*
+    `;
+
+    resultSummary.innerHTML = `
+        <h3 style="color: #2c3e50; margin-bottom: 20px;">📧 Modèle d'Email de Prospection</h3>
+        <div style="background: #f8f9fa; border: 1px solid #dfe6e9; border-radius: 8px; padding: 25px; font-family: 'Arial', sans-serif; font-size: 14px; line-height: 1.6;">
+            ${emailTemplate}
+        </div>
+        <button id="copy-email-btn" class="btn primary" style="margin-top: 15px; width: 100%;">📋 Copier l'email</button>
+    `;
+
+    document.getElementById('copy-email-btn').addEventListener('click', () => {
+        // Strip HTML tags for clipboard (keeping formatting where possible)
+        const textToCopy = document.createElement('div');
+        textToCopy.innerHTML = emailTemplate;
+        navigator.clipboard.writeText(textToCopy.innerText).then(() => {
+            document.getElementById('copy-email-btn').textContent = "✅ Copié !";
+            setTimeout(() => { document.getElementById('copy-email-btn').textContent = "📋 Copier l'email"; }, 2000);
+        });
+    });
+}
+
 downloadBtn.addEventListener('click', () => {
     if (!currentHtmlReport) return;
     const blob = new Blob([currentHtmlReport], { type: 'text/html' });
@@ -131,6 +217,7 @@ restartBtn.addEventListener('click', () => {
     dropZone.classList.remove('hidden');
     fileInput.value = '';
     currentHtmlReport = null;
+    downloadBtn.style.display = 'inline-block';
 });
 
 // --- Tab Logic ---

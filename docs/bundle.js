@@ -1153,6 +1153,16 @@
               }
             } else if (finding.type === "Publicit\xE9") {
               applyPenalty(15, `Tracker publicitaire ou reciblage d\xE9tect\xE9 (${finding.service})`, `THIRDPARTY_ADS_${finding.service}`);
+            } else if (finding.tags && finding.tags.includes("dom")) {
+              if (finding.severity === "critical") {
+                applyPenalty(25, finding.title, "DOM_CRITICAL");
+              } else if (finding.severity === "high") {
+                applyPenalty(15, finding.title, "DOM_HIGH");
+              } else if (finding.severity === "medium") {
+                applyPenalty(10, finding.title, "DOM_MEDIUM");
+              } else {
+                applyPenalty(5, finding.title, "DOM_LOW");
+              }
             } else if (finding.type === "Cleartext Protocol" && (!siteData || !siteData.finalUrl || !siteData.finalUrl.startsWith("http://"))) {
               applyPenalty(30, "Protocole en clair (HTTP) d\xE9tect\xE9 manuellement", "MANUAL_HTTP_CLEARTEXT");
             }
@@ -1223,6 +1233,9 @@
         }
         if (rawTheme === "Privacy & Data Flow" || finding.type === "Publicit\xE9" || finding.type === "Session Replay") {
           return "Confidentialit\xE9 et Traceurs Tiers";
+        }
+        if (finding.tags && finding.tags.includes("dom")) {
+          return "S\xE9curit\xE9 Applicative & DOM";
         }
         return rawTheme;
       }
@@ -1637,6 +1650,21 @@
           } else {
             html += `<p>Aucun cookie d\xE9tect\xE9 par l'audit passif sur cette page.</p>`;
           }
+          html += `<h4 class="section-title">\u{1F575}\uFE0F\u200D\u2642\uFE0F S\xE9curit\xE9 Applicative, DOM & SEO</h4>`;
+          const domFindings = report.findings ? report.findings.filter((f) => f.tags && f.tags.includes("dom")) : [];
+          if (domFindings.length > 0) {
+            html += `<ul class="info-list">`;
+            for (const f of domFindings) {
+              const riskColor = f.severity === "critical" ? "#e74c3c" : f.severity === "high" ? "#e67e22" : "#f1c40f";
+              html += `<li>
+                            <strong style="color: ${riskColor}">${f.title}</strong> 
+                            <div style="margin-top: 5px; color: #7f8c8d; font-size: 0.95em;">${f.description}</div>
+                         </li>`;
+            }
+            html += `</ul>`;
+          } else {
+            html += `<p>Aucune faille passive d\xE9tect\xE9e au niveau du DOM (Formulaires, SEO, Mixed Content).</p>`;
+          }
           html += `<h4 class="section-title">\u{1F310} \xC9cosyst\xE8me Tiers & Fuite de donn\xE9es</h4>`;
           if (report.thirdParties && report.thirdParties.length > 0) {
             html += `<ul class="info-list">`;
@@ -1741,6 +1769,15 @@
     loading.classList.remove("hidden");
     setTimeout(() => {
       try {
+        let parsedContent;
+        try {
+          parsedContent = JSON.parse(content);
+        } catch (e) {
+        }
+        if (parsedContent && parsedContent.isLocalsecAudit) {
+          renderSalesEmailView(parsedContent);
+          return;
+        }
         const normalizedData = importEvidenceString(content);
         let allFindings = [];
         allFindings.push(...analyzeHeaders(normalizedData.headers));
@@ -1793,6 +1830,74 @@
     errorCard.classList.remove("hidden");
     dropZone.classList.remove("hidden");
   }
+  function renderSalesEmailView(data) {
+    loading.classList.add("hidden");
+    resultCard.classList.remove("hidden");
+    downloadBtn.style.display = "none";
+    let color = "#3b82f6";
+    if (data.grade === "A") color = "#22c55e";
+    else if (data.grade === "B") color = "#eab308";
+    else if (data.grade === "C") color = "#f97316";
+    else color = "#ef4444";
+    scoreBadge.textContent = data.grade;
+    scoreBadge.style.backgroundColor = color;
+    scoreBadge.style.boxShadow = `0 0 20px ${color}80`;
+    const criticals = data.findings.filter((f) => f.severity === "critical" || f.severity === "high");
+    const hasSeo = data.findings.some((f) => f.tags && f.tags.includes("seo"));
+    const hasPrivacy = data.findings.some((f) => f.category === "Cookies Security" && f.severity === "high");
+    let painPoints = "";
+    if (criticals.length > 0) {
+      painPoints += `<li>\u26A0\uFE0F **Vuln\xE9rabilit\xE9s critiques d\xE9tect\xE9es** (${criticals.length} probl\xE8me(s) identifi\xE9(s) pouvant compromettre vos donn\xE9es)</li>`;
+    }
+    if (hasSeo) {
+      painPoints += `<li>\u{1F4C9} **P\xE9nalit\xE9 SEO potentielle** (Pratiques de r\xE9f\xE9rencement d\xE9tect\xE9es pouvant vous faire bannir de Google)</li>`;
+    }
+    if (hasPrivacy) {
+      painPoints += `<li>\u2696\uFE0F **Risque RGPD** (Vos cookies exposent les donn\xE9es de vos utilisateurs)</li>`;
+    }
+    if (painPoints === "") {
+      painPoints = `<li>\u{1F50D} **Am\xE9liorations de durcissement requises** pour correspondre aux standards 2026.</li>`;
+    }
+    const emailTemplate = `
+Objet : Faille de s\xE9curit\xE9 et risque de p\xE9nalit\xE9 d\xE9tect\xE9s sur ${new URL(data.siteUrl).hostname}
+
+Bonjour,
+
+En naviguant sur votre site internet (${new URL(data.siteUrl).hostname}), j'ai remarqu\xE9 quelques probl\xE8mes techniques qui exposent actuellement vos utilisateurs et votre activit\xE9.
+
+J'ai fait tourner un rapide audit de s\xE9curit\xE9 externe et votre site obtient la note de **${data.score}/100 (Grade ${data.grade})**.
+
+Voici les risques principaux actuellement visibles publiquement sur votre code :
+<ul>
+${painPoints}
+</ul>
+
+Ces probl\xE8mes peuvent non seulement faire fuiter les donn\xE9es de vos clients, mais aussi impacter lourdement votre r\xE9f\xE9rencement naturel.
+
+Nous accompagnons les entreprises dans la s\xE9curisation et la mise aux normes de leur architecture web. Seriez-vous disponible mardi prochain pour un \xE9change de 10 minutes afin que je vous montre les d\xE9tails techniques ?
+
+Cordialement,
+
+*G\xE9n\xE9r\xE9 par LocalSec Audit*
+    `;
+    resultSummary.innerHTML = `
+        <h3 style="color: #2c3e50; margin-bottom: 20px;">\u{1F4E7} Mod\xE8le d'Email de Prospection</h3>
+        <div style="background: #f8f9fa; border: 1px solid #dfe6e9; border-radius: 8px; padding: 25px; font-family: 'Arial', sans-serif; font-size: 14px; line-height: 1.6;">
+            ${emailTemplate}
+        </div>
+        <button id="copy-email-btn" class="btn primary" style="margin-top: 15px; width: 100%;">\u{1F4CB} Copier l'email</button>
+    `;
+    document.getElementById("copy-email-btn").addEventListener("click", () => {
+      const textToCopy = document.createElement("div");
+      textToCopy.innerHTML = emailTemplate;
+      navigator.clipboard.writeText(textToCopy.innerText).then(() => {
+        document.getElementById("copy-email-btn").textContent = "\u2705 Copi\xE9 !";
+        setTimeout(() => {
+          document.getElementById("copy-email-btn").textContent = "\u{1F4CB} Copier l'email";
+        }, 2e3);
+      });
+    });
+  }
   downloadBtn.addEventListener("click", () => {
     if (!currentHtmlReport) return;
     const blob = new Blob([currentHtmlReport], { type: "text/html" });
@@ -1809,6 +1914,7 @@
     dropZone.classList.remove("hidden");
     fileInput.value = "";
     currentHtmlReport = null;
+    downloadBtn.style.display = "inline-block";
   });
   var tabBtns = document.querySelectorAll(".tab-btn");
   var tabContents = document.querySelectorAll(".tab-content");
