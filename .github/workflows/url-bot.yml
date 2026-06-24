@@ -3,9 +3,9 @@ name: Collecteur d'URLs Bot
 on:
   # Permet de lancer le bot manuellement depuis l'interface GitHub
   workflow_dispatch:
-  # (Optionnel) Lancer automatiquement tous les lundis à 8h00
-  # schedule:
-  #   - cron: '0 8 * * 1'
+  # Exécuter automatiquement 2 fois par jour (00h00 et 12h00 UTC)
+  schedule:
+    - cron: '0 0,12 * * *'
 
 jobs:
   scrape-urls:
