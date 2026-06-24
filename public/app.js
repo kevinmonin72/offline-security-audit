@@ -163,17 +163,54 @@ refreshUrlsBtn.addEventListener('click', loadUrls);
 async function loadUrls() {
     urlListContainer.innerHTML = '<div class="spinner"></div><p>Chargement des URLs depuis le Cloud...</p>';
     try {
-        // Cache buster to always get fresh file
         const res = await fetch('urls-trouvees.txt?v=' + new Date().getTime());
-        if (!res.ok) {
-            throw new Error('Fichier introuvable. Le bot n\'a peut-être pas encore généré la liste.');
-        }
+        if (!res.ok) throw new Error('Fichier introuvable. Le bot n\'a peut-être pas encore généré la liste.');
+        
         const text = await res.text();
-        if (!text.trim()) {
+        const urls = text.split('\\n').map(u => u.trim()).filter(u => u);
+
+        if (urls.length === 0) {
             urlListContainer.textContent = "Le fichier est vide.";
-        } else {
-            urlListContainer.textContent = text;
+            return;
         }
+
+        urlListContainer.innerHTML = '';
+        
+        const fragment = document.createDocumentFragment();
+        const savedState = JSON.parse(localStorage.getItem('auditedUrls') || '{}');
+
+        urls.forEach((url, index) => {
+            const div = document.createElement('div');
+            div.className = 'url-item';
+            
+            const isChecked = savedState[url] === true;
+            if (isChecked) div.classList.add('checked');
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = isChecked;
+            cb.title = "Marquer comme audité";
+            
+            cb.addEventListener('change', (e) => {
+                const state = JSON.parse(localStorage.getItem('auditedUrls') || '{}');
+                state[url] = e.target.checked;
+                localStorage.setItem('auditedUrls', JSON.stringify(state));
+                if (e.target.checked) div.classList.add('checked');
+                else div.classList.remove('checked');
+            });
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.textContent = url;
+
+            div.appendChild(cb);
+            div.appendChild(link);
+            fragment.appendChild(div);
+        });
+
+        urlListContainer.appendChild(fragment);
+
     } catch (e) {
         urlListContainer.innerHTML = `<p style="color: #ef4444;">Erreur : ${e.message}</p>`;
     }

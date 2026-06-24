@@ -213,4 +213,43 @@ header p { color: var(--text-muted); margin-bottom: 30px; line-height: 1.5; }
     font-size: 0.85rem;
     white-space: pre-wrap;
     word-break: break-all;
+.url-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    gap: 15px;
+    transition: background 0.2s;
+}
+.url-item:last-child { border-bottom: none; }
+.url-item:hover { background: rgba(255, 255, 255, 0.05); }
+
+.url-item input[type="checkbox"] {
+    width: 20px; 
+    height: 20px; 
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.url-item a {
+    color: var(--text);
+    text-decoration: none;
+    flex-grow: 1;
+    font-size: 1.1rem;
+}
+.url-item a:hover { color: var(--primary); }
+
+.url-item.checked a {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+#url-list-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: left;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 10px;
+    border: 1px solid var(--border);
 }
