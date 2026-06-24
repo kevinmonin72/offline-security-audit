@@ -1,0 +1,30 @@
+name: Collecteur d'URLs Bot
+
+on:
+  # Permet de lancer le bot manuellement depuis l'interface GitHub
+  workflow_dispatch:
+  # (Optionnel) Lancer automatiquement tous les lundis à 8h00
+  # schedule:
+  #   - cron: '0 8 * * 1'
+
+jobs:
+  scrape-urls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v3
+
+      - name: Configurer Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Lancer le bot de recensement
+        # Remplacez l'URL par le domaine racine que vous souhaitez explorer
+        run: node url-scraper.js "https://example.com"
+
+      - name: Sauvegarder les résultats dans les artifacts GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: liste-urls
+          path: urls-trouvees.txt
