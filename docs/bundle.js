@@ -1940,9 +1940,7 @@ Cordialement,
       }
     });
   });
-  var refreshUrlsBtn = document.getElementById("refresh-urls-btn");
   var urlListContainer = document.getElementById("url-list-container");
-  refreshUrlsBtn.addEventListener("click", loadUrls);
   async function loadUrls() {
     urlListContainer.innerHTML = '<div class="spinner"></div><p>Chargement des URLs depuis le Cloud...</p>';
     try {
