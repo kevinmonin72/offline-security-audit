@@ -1,3 +1,16 @@
+const { importEvidenceString } = require('../lib/import-evidence-browser');
+const { analyzeHeaders } = require('../lib/analyze-headers');
+const { parseCookies } = require('../lib/parse-cookies');
+const { analyzeCookies } = require('../lib/analyze-cookies');
+const { analyzeTls } = require('../lib/analyze-tls');
+const { analyzeThirdParties } = require('../lib/analyze-third-parties');
+const { analyzeScripts } = require('../lib/analyze-scripts');
+const { analyzeTechnologies } = require('../lib/analyze-technologies');
+const { calculateScore } = require('../lib/score-site');
+const { buildRecommendations } = require('../lib/build-recommendations');
+const { buildExecutiveSummary } = require('../lib/build-executive-summary');
+const { renderHtmlReport } = require('../lib/render-report');
+
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const loading = document.getElementById('loading');
@@ -27,54 +40,78 @@ fileInput.addEventListener('change', (e) => {
 function handleFile(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
-        sendForAnalysis(e.target.result);
+        runAnalysisLocally(e.target.result);
     };
     reader.readAsText(file);
 }
 
-async function sendForAnalysis(content) {
+function runAnalysisLocally(content) {
     dropZone.classList.add('hidden');
     errorCard.classList.add('hidden');
     resultCard.classList.add('hidden');
     loading.classList.remove('hidden');
 
-    try {
-        const res = await fetch('/api/audit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
-        });
-        const data = await res.json();
+    setTimeout(() => {
+        try {
+            const normalizedData = importEvidenceString(content);
+            let allFindings = [];
+            allFindings.push(...analyzeHeaders(normalizedData.headers));
+            const parsedCookies = parseCookies(normalizedData.setCookies || []);
+            allFindings.push(...analyzeCookies(parsedCookies));
+            const auditDate = new Date();
+            const tlsResult = analyzeTls(normalizedData.tls, auditDate);
+            allFindings.push(...tlsResult.findings);
+            const allThirdPartyStrings = [...(normalizedData.thirdPartyDomains || []), ...(normalizedData.thirdPartyScripts || [])];
+            allFindings.push(...analyzeThirdParties(allThirdPartyStrings));
+            const scriptsInventory = analyzeScripts(normalizedData.thirdPartyScripts || []);
+            const techSummary = analyzeTechnologies(normalizedData.technologies || []);
 
-        loading.classList.add('hidden');
+            const scoreResult = calculateScore(normalizedData, allFindings);
+            const recommendations = buildRecommendations(allFindings);
+            const executiveSummaryText = buildExecutiveSummary(normalizedData.finalUrl || normalizedData.url, scoreResult, allFindings);
 
-        if (data.success) {
-            scoreBadge.textContent = data.grade;
-            // set colors based on grade
+            const reportResult = {
+                siteUrl: normalizedData.finalUrl || normalizedData.url,
+                score: scoreResult.score,
+                grade: scoreResult.grade,
+                executiveSummary: executiveSummaryText,
+                tlsSummary: tlsResult.summary,
+                cookies: parsedCookies,
+                thirdParties: analyzeThirdParties(allThirdPartyStrings),
+                recommendations: recommendations,
+                techSummary: techSummary,
+                scriptsInventory: scriptsInventory,
+                findings: allFindings
+            };
+
+            const htmlOutput = renderHtmlReport([reportResult]);
+
+            loading.classList.add('hidden');
+            
+            scoreBadge.textContent = reportResult.grade;
             let color = '#3b82f6';
-            if (data.grade === 'A') color = '#22c55e';
-            else if (data.grade === 'B') color = '#eab308';
-            else if (data.grade === 'C') color = '#f97316';
+            if (reportResult.grade === 'A') color = '#22c55e';
+            else if (reportResult.grade === 'B') color = '#eab308';
+            else if (reportResult.grade === 'C') color = '#f97316';
             else color = '#ef4444';
             scoreBadge.style.backgroundColor = color;
             scoreBadge.style.boxShadow = `0 0 20px ${color}80`;
 
-            resultSummary.textContent = data.summary;
-            currentHtmlReport = data.html;
+            resultSummary.textContent = executiveSummaryText;
+            currentHtmlReport = htmlOutput;
             resultCard.classList.remove('hidden');
-        } else {
-            showError(data.error);
+
+        } catch (e) {
+            loading.classList.add('hidden');
+            showError(e.message);
         }
-    } catch (e) {
-        loading.classList.add('hidden');
-        showError("Impossible de contacter le serveur local.");
-    }
+    }, 500); // Slight delay for UI transition
 }
 
 function showError(msg) {
     errorMessage.textContent = msg;
     errorCard.classList.remove('hidden');
-    dropZone.classList.remove('hidden'); // allow retry
+    dropZone.classList.remove('hidden');
 }
 
 downloadBtn.addEventListener('click', () => {
@@ -84,7 +121,6 @@ downloadBtn.addEventListener('click', () => {
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
-    // a.download = `audit-local-${new Date().getTime()}.html`; // Optionnel si on veut forcer le dl
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
