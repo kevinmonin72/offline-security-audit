@@ -27,6 +27,8 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
-          git add urls-trouvees.txt
+          # On déplace le fichier dans le dossier docs/ pour qu'il soit accessible via GitHub Pages
+          mv urls-trouvees.txt docs/urls-trouvees.txt
+          git add docs/urls-trouvees.txt
           git commit -m "🤖 Mise à jour automatique des URLs" || echo "Aucun changement détecté"
           git push

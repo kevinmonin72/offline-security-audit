@@ -20,7 +20,12 @@
             <p>Glissez-déposez vos preuves (HAR, JSON, TXT) pour une analyse instantanée et 100% hors-ligne.</p>
         </header>
 
-        <main>
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="audit-tab">Audit de Sécurité</button>
+            <button class="tab-btn" data-tab="urls-tab">Base d'URLs Automatisée</button>
+        </nav>
+
+        <main id="audit-tab" class="tab-content active">
             <div id="drop-zone" class="drop-zone">
                 <div class="drop-content">
                     <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -61,6 +66,20 @@
             <div id="error-card" class="error-card hidden">
                 <h2>❌ Erreur</h2>
                 <p id="error-message">Message d'erreur</p>
+            </div>
+        </main>
+
+        <main id="urls-tab" class="tab-content hidden">
+            <div class="url-list-card">
+                <h2>🌐 URLs recensées automatiquement</h2>
+                <p>Cette liste est mise à jour 2 fois par jour par votre bot GitHub.</p>
+                <div class="url-actions">
+                    <button id="refresh-urls-btn" class="btn secondary">Actualiser la liste</button>
+                </div>
+                <div id="url-list-container" class="url-list-container">
+                    <div class="spinner"></div>
+                    <p>Chargement des URLs depuis le Cloud...</p>
+                </div>
             </div>
         </main>
     </div>

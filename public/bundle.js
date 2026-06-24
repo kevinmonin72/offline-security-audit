@@ -1810,4 +1810,38 @@
     fileInput.value = "";
     currentHtmlReport = null;
   });
+  var tabBtns = document.querySelectorAll(".tab-btn");
+  var tabContents = document.querySelectorAll(".tab-content");
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tabBtns.forEach((b) => b.classList.remove("active"));
+      tabContents.forEach((c) => c.classList.add("hidden"));
+      btn.classList.add("active");
+      const targetId = btn.getAttribute("data-tab");
+      document.getElementById(targetId).classList.remove("hidden");
+      if (targetId === "urls-tab") {
+        loadUrls();
+      }
+    });
+  });
+  var refreshUrlsBtn = document.getElementById("refresh-urls-btn");
+  var urlListContainer = document.getElementById("url-list-container");
+  refreshUrlsBtn.addEventListener("click", loadUrls);
+  async function loadUrls() {
+    urlListContainer.innerHTML = '<div class="spinner"></div><p>Chargement des URLs depuis le Cloud...</p>';
+    try {
+      const res = await fetch("urls-trouvees.txt?v=" + (/* @__PURE__ */ new Date()).getTime());
+      if (!res.ok) {
+        throw new Error("Fichier introuvable. Le bot n'a peut-\xEAtre pas encore g\xE9n\xE9r\xE9 la liste.");
+      }
+      const text = await res.text();
+      if (!text.trim()) {
+        urlListContainer.textContent = "Le fichier est vide.";
+      } else {
+        urlListContainer.textContent = text;
+      }
+    } catch (e) {
+      urlListContainer.innerHTML = `<p style="color: #ef4444;">Erreur : ${e.message}</p>`;
+    }
+  }
 })();

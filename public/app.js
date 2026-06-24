@@ -132,3 +132,49 @@ restartBtn.addEventListener('click', () => {
     fileInput.value = '';
     currentHtmlReport = null;
 });
+
+// --- Tab Logic ---
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Remove active class from all
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.add('hidden'));
+        
+        // Add active to clicked
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        document.getElementById(targetId).classList.remove('hidden');
+
+        // If URLs tab, load data
+        if (targetId === 'urls-tab') {
+            loadUrls();
+        }
+    });
+});
+
+const refreshUrlsBtn = document.getElementById('refresh-urls-btn');
+const urlListContainer = document.getElementById('url-list-container');
+
+refreshUrlsBtn.addEventListener('click', loadUrls);
+
+async function loadUrls() {
+    urlListContainer.innerHTML = '<div class="spinner"></div><p>Chargement des URLs depuis le Cloud...</p>';
+    try {
+        // Cache buster to always get fresh file
+        const res = await fetch('urls-trouvees.txt?v=' + new Date().getTime());
+        if (!res.ok) {
+            throw new Error('Fichier introuvable. Le bot n\'a peut-être pas encore généré la liste.');
+        }
+        const text = await res.text();
+        if (!text.trim()) {
+            urlListContainer.textContent = "Le fichier est vide.";
+        } else {
+            urlListContainer.textContent = text;
+        }
+    } catch (e) {
+        urlListContainer.innerHTML = `<p style="color: #ef4444;">Erreur : ${e.message}</p>`;
+    }
+}
