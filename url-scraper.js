@@ -22,18 +22,32 @@ client.get(urlToScrape, {
     res.on('data', chunk => data += chunk);
     
     res.on('end', () => {
-        // Extraction basique des liens via regex (href="http...")
+        // Extraction des liens via regex (href="http...")
         const urlRegex = /href="(https?:\/\/[^"]+)"/g;
         let match;
-        const urls = new Set();
+        const rootUrls = new Set();
+        
+        let baseHost = "";
+        try {
+            baseHost = new URL(urlToScrape).hostname;
+        } catch(e) {}
         
         while ((match = urlRegex.exec(data)) !== null) {
-            urls.add(match[1]);
+            try {
+                const parsedUrl = new URL(match[1]);
+                // Ne garder que l'origine (ex: https://example.com) 
+                // et exclure les liens internes au site scanné
+                if (parsedUrl.hostname !== baseHost && !parsedUrl.hostname.includes(baseHost)) {
+                    rootUrls.add(parsedUrl.origin);
+                }
+            } catch (e) {
+                // Ignore silentieusement si l'URL est mal formée
+            }
         }
         
-        const result = Array.from(urls).join('\n');
+        const result = Array.from(rootUrls).join('\n');
         fs.writeFileSync('urls-trouvees.txt', result);
-        console.log(`✅ ${urls.size} URLs uniques trouvées et sauvegardées dans urls-trouvees.txt.`);
+        console.log(`✅ ${rootUrls.size} sites externes distincts trouvés et sauvegardés dans urls-trouvees.txt.`);
     });
 }).on('error', (e) => {
     console.error("❌ Erreur de requête :", e.message);
