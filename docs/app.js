@@ -77,6 +77,10 @@ function runAnalysisLocally(content) {
             }
 
             const normalizedData = importEvidenceString(content);
+            if (normalizedData && normalizedData.isLocalsecAudit) {
+                renderSalesEmailView(normalizedData);
+                return;
+            }
             let allFindings = [];
             allFindings.push(...analyzeHeaders(normalizedData.headers));
             const parsedCookies = parseCookies(normalizedData.setCookies || []);
@@ -140,7 +144,9 @@ function showError(msg) {
 function renderSalesEmailView(data) {
     loading.classList.add('hidden');
     resultCard.classList.remove('hidden');
-    downloadBtn.style.display = 'none';
+    downloadBtn.style.display = 'inline-block';
+    downloadBtn.textContent = '💾 Télécharger le Lead Magnet HTML';
+    currentHtmlReport = renderHtmlReport([data]);
 
     const findings = data.findings || [];
     // Vérification factuelle et filtrage strict des faux positifs

@@ -1408,320 +1408,396 @@
       function getGradeColor(grade) {
         switch (grade) {
           case "A":
-            return "#2ecc71";
-          // Vert
+            return "#22c55e";
           case "B":
-            return "#3498db";
-          // Bleu
+            return "#eab308";
           case "C":
-            return "#f1c40f";
-          // Jaune
+            return "#f97316";
           case "D":
-            return "#e67e22";
-          // Orange
-          case "F":
-            return "#e74c3c";
-          // Rouge
+            return "#ea580c";
           default:
-            return "#95a5a6";
+            return "#ef4444";
         }
       }
       function renderHtmlReport2(reportsArray) {
         if (!Array.isArray(reportsArray) || reportsArray.length === 0) {
-          return "<!DOCTYPE html><html lang='fr'><body><h1>Aucune donn\xE9e d'audit disponible.</h1></body></html>";
+          return "<!DOCTYPE html><html lang='fr'><body style='background:#0f172a;color:#fff;font-family:sans-serif;text-align:center;padding:50px;'><h1>Aucune donn\xE9e d'audit disponible.</h1></body></html>";
         }
-        let html = `<!DOCTYPE html>
+        const report = reportsArray[0];
+        const siteUrl = report.siteUrl || report.url || report.finalUrl || "Cible audit\xE9";
+        const hostname = (() => {
+          try {
+            return new URL(siteUrl).hostname;
+          } catch (e) {
+            return siteUrl;
+          }
+        })();
+        const score = report.score !== void 0 ? report.score : 50;
+        const grade = report.grade || (score >= 90 ? "A" : score >= 75 ? "B" : score >= 50 ? "C" : score >= 30 ? "D" : "F");
+        const color = getGradeColor(grade);
+        const rawFindings = report.findings || [];
+        const validFindings = rawFindings.filter((f) => {
+          const id = (f.id || "").toUpperCase();
+          const ev = (f.evidence || "").toLowerCase();
+          if (id.includes("AKIAIOSFODNN7EXAMPLE") || ev.includes("akiaiosfodnn7example")) return false;
+          if (ev.includes("placeholder") || ev.includes("example.com")) return false;
+          return true;
+        });
+        const order = { "Critical": 1, "High": 2, "Medium": 3, "Low": 4, "Info": 5 };
+        validFindings.sort((a, b) => {
+          const sa = order[a.severity || a.riskLevel || "Info"] || 6;
+          const sb = order[b.severity || b.riskLevel || "Info"] || 6;
+          return sa - sb;
+        });
+        const critCount = validFindings.filter((f) => f.severity === "Critical" || f.severity === "High").length;
+        const medCount = validFindings.filter((f) => f.severity === "Medium").length;
+        const sevColors = { "Critical": "#ef4444", "High": "#f97316", "Medium": "#eab308", "Low": "#3b82f6", "Info": "#94a3b8" };
+        let findingsHtml = "";
+        if (validFindings.length === 0) {
+          findingsHtml = `<div class="zero-flaws">\u2705 Architecture certifi\xE9e conforme aux standards de s\xE9curit\xE9 2026. Aucune vuln\xE9rabilit\xE9 externe d\xE9tect\xE9e.</div>`;
+        } else {
+          validFindings.forEach((f) => {
+            const sev = f.severity || f.riskLevel || "Info";
+            const sCol = sevColors[sev] || "#94a3b8";
+            let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 ou exposition d'en-t\xEAte identifi\xE9.";
+            if (sev === "Critical" || sev === "High") {
+              vulgarised = `\u{1F6A8} <strong>Danger Business Imm\xE9diat :</strong> ${f.description || "Cette br\xE8che permet \xE0 un attaquant d'intercepter des sessions clients, de voler des cookies ou d'injecter du contenu malveillant. Sanctions RGPD encourues (Art. 32)."}`;
+            } else if (sev === "Medium") {
+              vulgarised = `\u26A0\uFE0F <strong>Vuln\xE9rabilit\xE9 SEO & R\xE9putation :</strong> ${f.description || "Absence de directive de durcissement facilitant l'usurpation d'identit\xE9 du site et d\xE9gradant l'indice de confiance Google."}`;
+            }
+            let techFix = f.recommendation || "Appliquer les directives de durcissement ANSSI.";
+            if (f.category === "Headers" || (f.id || "").includes("HSTS") || (f.id || "").includes("CSP")) {
+              techFix = `Injecter en-t\xEAte HTTP : Content-Security-Policy: default-src 'self'; frame-ancestors 'none' & Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`;
+            } else if (f.category === "Cookies Security" || (f.id || "").includes("COOKIE")) {
+              techFix = `Set-Cookie flags: __Host-SESSIONID=<val>; SameSite=Strict; Secure; HttpOnly; Partitioned`;
+            } else if ((f.id || "").includes("CVE")) {
+              techFix = `Bump package semver: npm install --save-exact ${f.category ? f.category.toLowerCase() : "package"}@latest && rebuild bundle via CI/CD`;
+            } else if ((f.category || "").includes("Secret") || (f.id || "").includes("SECRET")) {
+              techFix = `Revoke token via vendor IAM API -> Rotate KMS secret -> Purge git history via bfg --replace-text`;
+            }
+            findingsHtml += `
+            <div class="finding-card" style="border-left-color: ${sCol}">
+                <div class="finding-head">
+                    <span class="finding-title">${f.title || "Vuln\xE9rabilit\xE9 D\xE9tect\xE9e"}</span>
+                    <span class="sev-badge" style="background: ${sCol}20; color: ${sCol}; border-color: ${sCol}60">${sev}</span>
+                </div>
+                <div class="finding-vulgarised">
+                    ${vulgarised}
+                </div>
+                <div class="tech-fix-box">
+                    <span class="tech-fix-label">\u{1F6E0}\uFE0F REM\xC9DIATION TECHNIQUE BRUTE :</span>
+                    <code>${techFix}</code>
+                </div>
+            </div>`;
+          });
+        }
+        const emailPitch = `Objet : Alerte S\xE9curit\xE9 & Conformit\xE9 \u2014 Failles d\xE9tect\xE9es sur ${hostname}
+
+Bonjour l'\xE9quipe de ${hostname},
+
+En analysant la posture de s\xE9curit\xE9 publique de votre architecture web, notre moteur d'audit a identifi\xE9 ${validFindings.length} faille(s) r\xE9siduelle(s) (Score : ${score}/100 - Grade ${grade}).
+
+${critCount > 0 ? `\u{1F6A8} Nous avons relev\xE9 ${critCount} vuln\xE9rabilit\xE9(s) critique(s) ou \xE9lev\xE9e(s) directement expos\xE9es. Dans le contexte actuel de recrudescence des ransomwares et des sanctions RGPD (Art. 32), ces br\xE8ches repr\xE9sentent un risque op\xE9rationnel et juridique imm\xE9diat.` : `\u26A0\uFE0F Bien que votre base principale soit accessible, nous avons relev\xE9 ${medCount} point(s) de durcissement requis pour \xE9viter toute compromission d'en-t\xEAte ou vol de session cookie.`}
+
+La bonne nouvelle ? La majorit\xE9 de ces failles peuvent \xEAtre corrig\xE9es en moins d'une heure par un expert.
+
+J'ai pr\xE9par\xE9 un dossier technique d'intervention contenant le code exact de rem\xE9diation pour chacune de ces anomalies. Seriez-vous disponible mardi prochain \xE0 14h pour un briefing t\xE9l\xE9phonique de 10 minutes afin que je vous transmette le dossier ?
+
+Bien \xE0 vous,
+
+Responsable Audit Cyber & Conformit\xE9`;
+        const now = (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR");
+        return `<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapport d'Audit S\xE9curit\xE9 Passif</title>
+    <title>Audit S\xE9curit\xE9 \u2014 ${hostname}</title>
     <style>
         :root {
-            --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            --bg-body: #f4f6f8;
-            --color-text: #2c3e50;
-            --color-border: #dfe6e9;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #8b5cf6;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: var(--font-main);
-            background-color: var(--bg-body);
-            color: var(--color-text);
-            line-height: 1.6;
-            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+            color: var(--text-main);
+            min-height: 100vh;
             padding: 40px 20px;
+            line-height: 1.6;
         }
         .container {
-            max-width: 1100px;
+            max-width: 900px;
             margin: 0 auto;
         }
-        h1 {
-            text-align: center;
-            font-size: 2.5em;
-            margin-bottom: 50px;
-            color: #34495e;
-        }
-        
-        /* Tableau R\xE9capitulatif */
-        .summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 60px;
-        }
-        .summary-table th, .summary-table td {
-            padding: 16px 24px;
-            text-align: left;
-            border-bottom: 1px solid var(--color-border);
-        }
-        .summary-table th {
-            background-color: #2c3e50;
-            color: white;
-            font-weight: 600;
-        }
-        .summary-table a {
-            color: #2980b9;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .summary-table a:hover {
-            text-decoration: underline;
-        }
-
-        /* Badge pour la note */
-        .badge {
-            display: inline-block;
-            color: white;
-            font-weight: bold;
-            padding: 6px 16px;
-            border-radius: 20px;
-            text-align: center;
-            min-width: 30px;
-        }
-
-        /* Cartes de Sites */
-        .site-card {
-            background: white;
-            border-radius: 10px;
+        .hero {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
             padding: 40px;
-            margin-bottom: 50px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            border-top: 6px solid #bdc3c7;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
         }
-        .site-header {
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: -50%; right: -10%;
+            width: 300px; height: 300px;
+            background: ${color};
+            filter: blur(120px);
+            opacity: 0.25;
+            z-index: 0;
+        }
+        .hero-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
-            border-bottom: 2px solid var(--color-border);
-            padding-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 20px;
+            position: relative;
+            z-index: 1;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 25px;
         }
-        .site-title {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #2c3e50;
-            margin: 0;
+        .target-info h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #38bdf8, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        .executive-summary {
-            font-size: 1.15em;
-            background: #f8f9fa;
-            padding: 20px 25px;
-            border-left: 5px solid #34495e;
-            border-radius: 0 8px 8px 0;
-            margin-bottom: 35px;
-            color: #4a5568;
-            font-style: italic;
+        .target-info p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 4px;
         }
-
-        /* Sections d'information internes */
+        .score-circle {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .grade-pill {
+            font-size: 2.2rem;
+            font-weight: 900;
+            background: ${color};
+            color: #fff;
+            width: 70px; height: 70px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 30px ${color}80;
+        }
+        .score-num {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .score-num span {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .stat-box {
+            background: rgba(15, 23, 42, 0.6);
+            padding: 18px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+        .stat-val {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #38bdf8;
+        }
+        .stat-lbl {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
         .section-title {
-            color: #2980b9;
-            margin-top: 40px;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            border-bottom: 1px solid #ecf0f1;
-            padding-bottom: 8px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        
-        .info-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+        .finding-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-left: 6px solid #3b82f6;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
         }
-        .info-list li {
-            background: #fdfdfd;
-            border: 1px solid #ecf0f1;
-            padding: 12px 15px;
-            margin-bottom: 8px;
-            border-radius: 6px;
+        .finding-card:hover {
+            transform: translateY(-2px);
         }
-
-        .tag {
-            display: inline-block;
-            background: #ecf0f1;
-            color: #34495e;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            margin-right: 5px;
-            font-weight: 600;
+        .finding-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
         }
-        .tag-session {
-            background: #f39c12;
-            color: white;
+        .finding-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
         }
-
-        /* Recommandations */
-        .reco-block {
-            margin-bottom: 25px;
-            padding: 20px;
+        .sev-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid;
+        }
+        .finding-vulgarised {
+            color: #cbd5e1;
+            font-size: 0.98rem;
+            margin-bottom: 18px;
+            background: rgba(0,0,0,0.25);
+            padding: 16px;
+            border-radius: 10px;
+        }
+        .tech-fix-box {
+            background: #0f172a;
+            border: 1px solid #334155;
             border-radius: 8px;
-            background: #fff;
+            padding: 14px;
         }
-        .reco-imm\xE9diat { border-left: 5px solid #e74c3c; background: #fdf3f2; }
-        .reco-important { border-left: 5px solid #e67e22; background: #fef7f1; }
-        .reco-am\xE9lioration { border-left: 5px solid #3498db; background: #f4f9fd; }
-        
-        .reco-block h4 { margin-top: 0; font-size: 1.2em; margin-bottom: 15px; }
-        .reco-theme { font-weight: bold; color: #2c3e50; margin-top: 15px; margin-bottom: 10px; }
-        .reco-ul { margin-top: 5px; padding-left: 20px; }
-        .reco-ul li { margin-bottom: 8px; }
-
+        .tech-fix-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .tech-fix-box code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            color: #38bdf8;
+            word-break: break-all;
+        }
+        .zero-flaws {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid #22c55e;
+            color: #22c55e;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 40px;
+        }
+        .pitch-card {
+            background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9));
+            border: 2px solid var(--accent);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 50px;
+            position: relative;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+        }
+        .pitch-tag {
+            position: absolute;
+            top: -14px; left: 30px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 4px 16px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .pitch-text {
+            white-space: pre-wrap;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Rapport d'Audit de S\xE9curit\xE9</h1>
-
-        <!-- SECTION : TABLEAU R\xC9CAPITULATIF -->
-        <h2>R\xE9capitulatif Global</h2>
-        <table class="summary-table">
-            <thead>
-                <tr>
-                    <th>Domaine Audit\xE9</th>
-                    <th>Score de S\xE9curit\xE9</th>
-                    <th>Grade</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        for (const report of reportsArray) {
-          html += `
-                <tr>
-                    <td><a href="#site-${report.siteUrl}">${report.siteUrl}</a></td>
-                    <td><strong>${report.score} / 100</strong></td>
-                    <td><span class="badge" style="background-color: ${getGradeColor(report.grade)}">${report.grade}</span></td>
-                </tr>`;
-        }
-        html += `
-            </tbody>
-        </table>
-
-        <!-- SECTION : D\xC9TAIL PAR SITE -->
-        <h2>D\xE9tails par Site</h2>`;
-        for (const report of reportsArray) {
-          html += `
-        <div class="site-card" id="site-${report.siteUrl}" style="border-top-color: ${getGradeColor(report.grade)}">
-            <div class="site-header">
-                <h3 class="site-title">${report.siteUrl}</h3>
-                <div class="badge" style="background-color: ${getGradeColor(report.grade)}; font-size: 1.4em; padding: 8px 24px;">
-                    Grade ${report.grade} (${report.score})
+        <div class="hero">
+            <div class="hero-top">
+                <div class="target-info">
+                    <h1>\u{1F6E1}\uFE0F Dossier d'Audit Cyber</h1>
+                    <p>Cible : <strong>${hostname}</strong> \u2014 Date : ${now}</p>
+                </div>
+                <div class="score-circle">
+                    <div class="score-num">
+                        ${score}/100
+                        <span>Score Global</span>
+                    </div>
+                    <div class="grade-pill">${grade}</div>
                 </div>
             </div>
-            
-            <div class="executive-summary">
-                ${report.executiveSummary || "R\xE9sum\xE9 ex\xE9cutif non disponible."}
-            </div>`;
-          if (report.tlsSummary) {
-            html += `<h4 class="section-title">\u{1F512} Chiffrement des Transports (TLS)</h4>`;
-            html += `<ul class="info-list">`;
-            html += `<li><strong>Protocole configur\xE9 :</strong> ${report.tlsSummary.protocol || "Non d\xE9tect\xE9"}</li>`;
-            html += `<li><strong>Autorit\xE9 \xE9mettrice :</strong> ${report.tlsSummary.issuer || "Inconnue"}</li>`;
-            if (report.tlsSummary.daysRemaining !== null && report.tlsSummary.daysRemaining !== void 0) {
-              const days = report.tlsSummary.daysRemaining;
-              const statusColor = days < 0 ? "#e74c3c" : days < 30 ? "#e67e22" : "#27ae60";
-              const statusText = days < 0 ? `Expir\xE9 depuis ${Math.abs(days)} jours` : `Valide (${days} jours restants)`;
-              html += `<li><strong>Statut d'expiration :</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></li>`;
-            }
-            html += `</ul>`;
-          }
-          html += `<h4 class="section-title">\u{1F36A} Politiques des Cookies & Sessions</h4>`;
-          if (report.cookies && report.cookies.length > 0) {
-            html += `<ul class="info-list">`;
-            for (const cookie of report.cookies) {
-              const flags = [];
-              if (cookie.secure) flags.push('<span class="tag">Secure</span>');
-              if (cookie.httpOnly) flags.push('<span class="tag">HttpOnly</span>');
-              if (cookie.sameSite) flags.push(`<span class="tag">SameSite=${cookie.sameSite}</span>`);
-              if (cookie.isSession) flags.push('<span class="tag tag-session">Session</span>');
-              html += `<li><strong>${cookie.name}</strong> &nbsp; ${flags.length > 0 ? flags.join("") : "<em>Aucune protection (ni Secure, ni HttpOnly)</em>"}</li>`;
-            }
-            html += `</ul>`;
-          } else {
-            html += `<p>Aucun cookie d\xE9tect\xE9 par l'audit passif sur cette page.</p>`;
-          }
-          html += `<h4 class="section-title">\u{1F575}\uFE0F\u200D\u2642\uFE0F S\xE9curit\xE9 Applicative, DOM & SEO</h4>`;
-          const domFindings = report.findings ? report.findings.filter((f) => f.tags && f.tags.includes("dom")) : [];
-          if (domFindings.length > 0) {
-            html += `<ul class="info-list">`;
-            for (const f of domFindings) {
-              const riskColor = f.severity === "critical" ? "#e74c3c" : f.severity === "high" ? "#e67e22" : "#f1c40f";
-              html += `<li>
-                            <strong style="color: ${riskColor}">${f.title}</strong> 
-                            <div style="margin-top: 5px; color: #7f8c8d; font-size: 0.95em;">${f.description}</div>
-                         </li>`;
-            }
-            html += `</ul>`;
-          } else {
-            html += `<p>Aucune faille passive d\xE9tect\xE9e au niveau du DOM (Formulaires, SEO, Mixed Content).</p>`;
-          }
-          html += `<h4 class="section-title">\u{1F310} \xC9cosyst\xE8me Tiers & Fuite de donn\xE9es</h4>`;
-          if (report.thirdParties && report.thirdParties.length > 0) {
-            html += `<ul class="info-list">`;
-            for (const tp of report.thirdParties) {
-              const riskColor = tp.riskLevel === "High" ? "#e74c3c" : tp.riskLevel === "Medium" ? "#e67e22" : "#27ae60";
-              html += `<li>
-                            <strong>${tp.service}</strong> <span class="tag">${tp.type}</span> 
-                            | Risque RGPD : <strong style="color: ${riskColor}">${tp.riskLevel}</strong>
-                            <div style="margin-top: 5px; color: #7f8c8d; font-size: 0.95em;">${tp.justification}</div>
-                         </li>`;
-            }
-            html += `</ul>`;
-          } else {
-            html += `<p>Aucun domaine de tracking tiers significatif n'a \xE9t\xE9 d\xE9tect\xE9.</p>`;
-          }
-          if (report.recommendations) {
-            html += `<h4 class="section-title">\u{1F4CB} Plan d'Action (Rem\xE9diations)</h4>`;
-            const renderPriorityBox = (prioKey, title, cssClass) => {
-              if (report.recommendations[prioKey] && report.recommendations[prioKey].length > 0) {
-                html += `<div class="reco-block ${cssClass}">
-                                <h4 style="color: ${cssClass.includes("imm\xE9diat") ? "#c0392b" : cssClass.includes("important") ? "#d35400" : "#2980b9"}">${title}</h4>`;
-                for (const group of report.recommendations[prioKey]) {
-                  html += `<div class="reco-theme">${group.theme} :</div><ul class="reco-ul">`;
-                  for (const action of group.actions) {
-                    html += `<li>${action}</li>`;
-                  }
-                  html += `</ul>`;
-                }
-                html += `</div>`;
-              }
-            };
-            renderPriorityBox("imm\xE9diat", "\u{1F6D1} Actions Imm\xE9diates", "reco-imm\xE9diat");
-            renderPriorityBox("important", "\u26A0\uFE0F Actions Importantes", "reco-important");
-            renderPriorityBox("am\xE9lioration", "\u{1F4A1} Am\xE9liorations de Durcissement", "reco-am\xE9lioration");
-            if (!report.recommendations["imm\xE9diat"]?.length && !report.recommendations["important"]?.length && !report.recommendations["am\xE9lioration"]?.length) {
-              html += `<p>Aucune recommandation technique \xE0 formuler. La posture est excellente.</p>`;
-            }
-          }
-          html += `</div>`;
-        }
-        html += `
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-val" style="color: ${critCount > 0 ? "#ef4444" : "#22c55e"}">${critCount > 0 ? "ALERTE" : "PROTECT"}</div>
+                    <div class="stat-lbl">Statut Exposition</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val">${validFindings.length}</div>
+                    <div class="stat-lbl">Failles Confirm\xE9es</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val">${critCount}</div>
+                    <div class="stat-lbl">Critiques / \xC9lev\xE9es</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">
+            <span>\u{1F3AF} Matrice des Failles & Correctifs</span>
+        </div>
+
+        ${findingsHtml}
+
+        <div class="pitch-card">
+            <div class="pitch-tag">\u{1F9F2} Mod\xE8le Email Prospection Pr\xEAt \xE0 l'Emploi</div>
+            <div class="pitch-text">${emailPitch}</div>
+        </div>
+
+        <div class="footer">
+            Rapport g\xE9n\xE9r\xE9 de mani\xE8re autonome par LocalSec Audit Pro v2.0
+        </div>
     </div>
 </body>
 </html>`;
-        return html;
       }
       module.exports = {
         renderHtmlReport: renderHtmlReport2
@@ -1801,6 +1877,10 @@
           return;
         }
         const normalizedData = importEvidenceString(content);
+        if (normalizedData && normalizedData.isLocalsecAudit) {
+          renderSalesEmailView(normalizedData);
+          return;
+        }
         let allFindings = [];
         allFindings.push(...analyzeHeaders(normalizedData.headers));
         const parsedCookies = parseCookies(normalizedData.setCookies || []);
@@ -1855,7 +1935,9 @@
   function renderSalesEmailView(data) {
     loading.classList.add("hidden");
     resultCard.classList.remove("hidden");
-    downloadBtn.style.display = "none";
+    downloadBtn.style.display = "inline-block";
+    downloadBtn.textContent = "\u{1F4BE} T\xE9l\xE9charger le Lead Magnet HTML";
+    currentHtmlReport = renderHtmlReport([data]);
     const findings = data.findings || [];
     const validFindings = findings.filter((f) => {
       const id = (f.id || "").toUpperCase();
