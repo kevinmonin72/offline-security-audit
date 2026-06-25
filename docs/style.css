@@ -19,8 +19,9 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    align-items: flex-start;
+    padding: 40px 16px;
+    overflow-x: hidden;
 }
 
 /* Background Orbs */
@@ -204,15 +205,16 @@ header p { color: var(--text-muted); margin-bottom: 30px; line-height: 1.5; }
 }
 .url-list-container {
     background: var(--bg-dark);
-    padding: 20px;
+    padding: 12px;
     border-radius: 8px;
-    max-height: 400px;
+    max-height: 60vh;
     overflow-y: auto;
     border: 1px solid var(--border);
     font-family: monospace;
     font-size: 0.85rem;
-    white-space: pre-wrap;
     word-break: break-all;
+}
+
 .url-item {
     display: flex;
     align-items: center;
@@ -232,7 +234,7 @@ header p { color: var(--text-muted); margin-bottom: 30px; line-height: 1.5; }
 }
 
 .url-item a {
-    color: var(--text);
+    color: var(--text-main);
     text-decoration: none;
     flex-grow: 1;
     font-size: 1.1rem;
@@ -244,12 +246,37 @@ header p { color: var(--text-muted); margin-bottom: 30px; line-height: 1.5; }
     color: var(--text-muted);
 }
 
-#url-list-container {
-    max-height: 60vh;
-    overflow-y: auto;
-    text-align: left;
-    background: rgba(0,0,0,0.2);
-    border-radius: 12px;
-    padding: 10px;
+.url-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.url-actions-bar .url-count {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.url-search {
+    flex: 1;
+    max-width: 220px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.3);
+    color: var(--text-main);
     border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.url-search::placeholder { color: var(--text-muted); }
+.url-search:focus { outline: none; border-color: var(--primary); }
+
+@media (max-width: 640px) {
+    .container { padding: 24px 16px; max-width: 100%; }
+    header h1 { font-size: 1.5rem; }
+    .drop-zone { padding: 40px 16px; }
+    .result-card { flex-direction: column; text-align: center; }
 }

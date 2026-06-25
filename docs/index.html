@@ -62,6 +62,12 @@
         <main id="urls-tab" class="tab-content hidden">
             <div class="url-list-card">
                 <h2>🌐 Liste d'URLs à prospecter</h2>
+                <p>Liste publique générée toutes les 12h par le bot collecteur.</p>
+                <div class="url-actions-bar">
+                    <span class="url-count" id="url-count">—</span>
+                    <input type="search" id="url-search" class="url-search" placeholder="Filtrer…">
+                    <button id="refresh-urls-btn" class="btn secondary" type="button">↻ Rafraîchir</button>
+                </div>
                 <div id="url-list-container" class="url-list-container">
                     <div class="spinner"></div>
                     <p>Chargement des URLs depuis le Cloud...</p>

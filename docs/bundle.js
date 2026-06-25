@@ -1889,7 +1889,8 @@ Responsable Audit Cyber & Conformit\xE9`;
         const tlsResult = analyzeTls(normalizedData.tls, auditDate);
         allFindings.push(...tlsResult.findings);
         const allThirdPartyStrings = [...normalizedData.thirdPartyDomains || [], ...normalizedData.thirdPartyScripts || []];
-        allFindings.push(...analyzeThirdParties(allThirdPartyStrings));
+        const thirdPartiesResult = analyzeThirdParties(allThirdPartyStrings);
+        allFindings.push(...thirdPartiesResult);
         const scriptsInventory = analyzeScripts(normalizedData.thirdPartyScripts || []);
         const techSummary = analyzeTechnologies(normalizedData.technologies || []);
         const scoreResult = calculateScore(normalizedData, allFindings);
@@ -1902,7 +1903,7 @@ Responsable Audit Cyber & Conformit\xE9`;
           executiveSummary: executiveSummaryText,
           tlsSummary: tlsResult.summary,
           cookies: parsedCookies,
-          thirdParties: analyzeThirdParties(allThirdPartyStrings),
+          thirdParties: thirdPartiesResult,
           recommendations,
           techSummary,
           scriptsInventory,
@@ -2102,47 +2103,77 @@ Bien \xE0 vous,
     });
   });
   var urlListContainer = document.getElementById("url-list-container");
+  var refreshUrlsBtn = document.getElementById("refresh-urls-btn");
+  var urlSearchInput = document.getElementById("url-search");
+  var urlCountEl = document.getElementById("url-count");
+  var allLoadedUrls = [];
+  if (refreshUrlsBtn) refreshUrlsBtn.addEventListener("click", loadUrls);
+  if (urlSearchInput) urlSearchInput.addEventListener("input", () => renderUrlList(allLoadedUrls, urlSearchInput.value.trim().toLowerCase()));
+  function renderUrlList(urls, filter = "") {
+    const filtered = filter ? urls.filter((u) => u.toLowerCase().includes(filter)) : urls;
+    urlListContainer.innerHTML = "";
+    if (filtered.length === 0) {
+      urlListContainer.innerHTML = '<p style="color: var(--text-muted); padding: 12px;">Aucune URL ne correspond.</p>';
+      if (urlCountEl) urlCountEl.textContent = `0 / ${urls.length}`;
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    const savedState = JSON.parse(localStorage.getItem("auditedUrls") || "{}");
+    let auditedCount = 0;
+    filtered.forEach((url) => {
+      const div = document.createElement("div");
+      div.className = "url-item";
+      const isChecked = savedState[url] === true;
+      if (isChecked) {
+        div.classList.add("checked");
+        auditedCount++;
+      }
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = isChecked;
+      cb.title = "Marquer comme audit\xE9";
+      cb.addEventListener("change", (e) => {
+        const state = JSON.parse(localStorage.getItem("auditedUrls") || "{}");
+        state[url] = e.target.checked;
+        localStorage.setItem("auditedUrls", JSON.stringify(state));
+        if (e.target.checked) div.classList.add("checked");
+        else div.classList.remove("checked");
+        updateCount();
+      });
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = url;
+      div.appendChild(cb);
+      div.appendChild(link);
+      fragment.appendChild(div);
+    });
+    urlListContainer.appendChild(fragment);
+    if (urlCountEl) urlCountEl.textContent = `${filtered.length} affich\xE9es / ${urls.length} totales \u2014 ${auditedCount} audit\xE9es`;
+  }
+  function updateCount() {
+    if (!urlCountEl) return;
+    const savedState = JSON.parse(localStorage.getItem("auditedUrls") || "{}");
+    const auditedCount = allLoadedUrls.filter((u) => savedState[u]).length;
+    urlCountEl.textContent = `${allLoadedUrls.length} URLs \u2014 ${auditedCount} audit\xE9es`;
+  }
   async function loadUrls() {
     urlListContainer.innerHTML = '<div class="spinner"></div><p>Chargement des URLs depuis le Cloud...</p>';
+    if (urlCountEl) urlCountEl.textContent = "\u2014";
     try {
-      const res = await fetch("urls-trouvees.txt?v=" + (/* @__PURE__ */ new Date()).getTime());
+      const res = await fetch("urls-trouvees.txt?v=" + Date.now());
       if (!res.ok) throw new Error("Fichier introuvable. Le bot n'a peut-\xEAtre pas encore g\xE9n\xE9r\xE9 la liste.");
       const text = await res.text();
-      const urls = text.split("\n").map((u) => u.trim()).filter((u) => u);
-      if (urls.length === 0) {
-        urlListContainer.textContent = "Le fichier est vide.";
+      allLoadedUrls = [...new Set(text.split("\n").map((u) => u.trim()).filter(Boolean))].sort();
+      if (allLoadedUrls.length === 0) {
+        urlListContainer.innerHTML = '<p style="color: var(--text-muted);">Le fichier est vide.</p>';
         return;
       }
-      urlListContainer.innerHTML = "";
-      const fragment = document.createDocumentFragment();
-      const savedState = JSON.parse(localStorage.getItem("auditedUrls") || "{}");
-      urls.forEach((url, index) => {
-        const div = document.createElement("div");
-        div.className = "url-item";
-        const isChecked = savedState[url] === true;
-        if (isChecked) div.classList.add("checked");
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = isChecked;
-        cb.title = "Marquer comme audit\xE9";
-        cb.addEventListener("change", (e) => {
-          const state = JSON.parse(localStorage.getItem("auditedUrls") || "{}");
-          state[url] = e.target.checked;
-          localStorage.setItem("auditedUrls", JSON.stringify(state));
-          if (e.target.checked) div.classList.add("checked");
-          else div.classList.remove("checked");
-        });
-        const link = document.createElement("a");
-        link.href = url;
-        link.target = "_blank";
-        link.textContent = url;
-        div.appendChild(cb);
-        div.appendChild(link);
-        fragment.appendChild(div);
-      });
-      urlListContainer.appendChild(fragment);
+      renderUrlList(allLoadedUrls, urlSearchInput ? urlSearchInput.value.trim().toLowerCase() : "");
     } catch (e) {
       urlListContainer.innerHTML = `<p style="color: #ef4444;">Erreur : ${e.message}</p>`;
+      if (urlCountEl) urlCountEl.textContent = "\u2014";
     }
   }
 })();
