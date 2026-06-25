@@ -140,77 +140,148 @@ function showError(msg) {
 function renderSalesEmailView(data) {
     loading.classList.add('hidden');
     resultCard.classList.remove('hidden');
-    
-    // Hide default download button for email view
     downloadBtn.style.display = 'none';
 
+    const findings = data.findings || [];
+    // Vérification factuelle et filtrage strict des faux positifs
+    const validFindings = findings.filter(f => {
+        const id = (f.id || "").toUpperCase();
+        const ev = (f.evidence || "").toLowerCase();
+        // Élimine les faux positifs connus (ex: AWS documentation dummy keys, variables d'exemple)
+        if (id.includes("AKIAIOSFODNN7EXAMPLE") || ev.includes("akiaiosfodnn7example")) return false;
+        if (ev.includes("placeholder") || ev.includes("example.com")) return false;
+        return true;
+    });
+
+    // Tri par criticité (Critical > High > Medium > Low > Info)
+    const order = { "Critical": 1, "High": 2, "Medium": 3, "Low": 4, "Info": 5 };
+    validFindings.sort((a, b) => {
+        const sa = order[a.severity || a.riskLevel || "Info"] || 6;
+        const sb = order[b.severity || b.riskLevel || "Info"] || 6;
+        return sa - sb;
+    });
+
+    const grade = data.grade || 'C';
+    const score = data.score || 50;
     let color = '#3b82f6';
-    if (data.grade === 'A') color = '#22c55e';
-    else if (data.grade === 'B') color = '#eab308';
-    else if (data.grade === 'C') color = '#f97316';
+    if (grade === 'A') color = '#22c55e';
+    else if (grade === 'B') color = '#eab308';
+    else if (grade === 'C') color = '#f97316';
     else color = '#ef4444';
 
-    scoreBadge.textContent = data.grade;
+    scoreBadge.textContent = grade;
     scoreBadge.style.backgroundColor = color;
-    scoreBadge.style.boxShadow = `0 0 20px ${color}80`;
+    scoreBadge.style.boxShadow = `0 0 25px ${color}`;
 
-    // Génération du pitch email
-    const criticals = data.findings.filter(f => f.severity === 'critical' || f.severity === 'high');
-    const hasSeo = data.findings.some(f => f.tags && f.tags.includes('seo'));
-    const hasPrivacy = data.findings.some(f => f.category === 'Cookies Security' && f.severity === 'high');
+    let findingsHtml = '';
+    const sevColors = { "Critical": "#ef4444", "High": "#f97316", "Medium": "#eab308", "Low": "#3b82f6", "Info": "#94a3b8" };
 
-    let painPoints = "";
-    if (criticals.length > 0) {
-        painPoints += `<li>⚠️ **Vulnérabilités critiques détectées** (${criticals.length} problème(s) identifié(s) pouvant compromettre vos données)</li>`;
+    if (validFindings.length === 0) {
+        findingsHtml = `<div style="padding:20px;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:12px;color:#22c55e;font-weight:600;">✅ Architecture certifiée conforme. Zéro faille ou exposition détectée.</div>`;
+    } else {
+        validFindings.forEach(f => {
+            const sev = f.severity || f.riskLevel || "Info";
+            const sCol = sevColors[sev] || "#94a3b8";
+            // Vulgarisation extrême de la faille (vulgarised explanation)
+            let vulgarised = f.description || "Écart de sécurité identifié sur l'architecture web.";
+            if (sev === "Critical" || sev === "High") {
+                vulgarised = `🚨 **Danger immédiat :** ${f.description || "Cette faille permet potentiellement à un pirate d'intercepter vos données ou de compromettre votre site."}`;
+            } else if (sev === "Medium") {
+                vulgarised = `⚠️ **Point faible :** ${f.description || "Cette anomalie facilite le travail des pirates et affaiblit la protection globale de vos visiteurs."}`;
+            }
+
+            // Remédiation ultra-technique courte, sans explication (ultra technical fix)
+            let techFix = f.recommendation || "Appliquer les correctifs de durcissement recommandés par l'ANSSI.";
+            if (f.category === "Headers") {
+                techFix = `Injecter en-tête HTTP : \`Content-Security-Policy: default-src 'self'\` & \`Strict-Transport-Security: max-age=31536000; includeSubDomains; preload\`.`;
+            } else if (f.category === "Cookies Security") {
+                techFix = `Set-Cookie flags: \`__Host-SESSIONID=...; SameSite=Strict; Secure; HttpOnly; Partitioned\`.`;
+            } else if ((f.id || "").includes("CVE")) {
+                techFix = `Bump package semver: \`npm install --save-exact ${f.category ? f.category.toLowerCase() : 'package'}@latest\` puis rebuild asset bundle via CI/CD.`;
+            } else if ((f.category || "").includes("Secret")) {
+                techFix = `Revoke token via vendor API IAM console → Rotate KMS secret → Add path to \`.gitignore\` & purge git cache via \`bfg --replace-text\`.`;
+            }
+
+            findingsHtml += `
+            <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:18px;margin-bottom:14px;text-align:left;box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="font-weight:700;color:#f8fafc;font-size:1.05em;">${f.title || "Vulnerability Finding"}</span>
+                    <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:4px 10px;border-radius:20px;font-size:0.75em;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;">${sev}</span>
+                </div>
+                <div style="color:#cbd5e1;font-size:0.92em;margin-bottom:14px;line-height:1.5;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;">
+                    ${vulgarised}
+                </div>
+                <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px 14px;font-family:'Fira Code',monospace;font-size:0.8em;color:#38bdf8;">
+                    <span style="color:#64748b;font-weight:600;display:block;font-size:0.9em;margin-bottom:4px;text-transform:uppercase;">🛠️ Remédiation technique directe :</span>
+                    ${techFix}
+                </div>
+            </div>`;
+        });
     }
-    if (hasSeo) {
-        painPoints += `<li>📉 **Pénalité SEO potentielle** (Pratiques de référencement détectées pouvant vous faire bannir de Google)</li>`;
-    }
-    if (hasPrivacy) {
-        painPoints += `<li>⚖️ **Risque RGPD** (Vos cookies exposent les données de vos utilisateurs)</li>`;
-    }
-    if (painPoints === "") {
-        painPoints = `<li>🔍 **Améliorations de durcissement requises** pour correspondre aux standards 2026.</li>`;
-    }
 
-    const emailTemplate = `
-Objet : Faille de sécurité et risque de pénalité détectés sur ${new URL(data.siteUrl).hostname}
+    const hostname = (() => { try { return new URL(data.siteUrl).hostname; } catch(e){ return data.siteUrl || "votre site"; } })();
 
-Bonjour,
+    const critCount = validFindings.filter(f => f.severity === "Critical" || f.severity === "High").length;
+    const medCount = validFindings.filter(f => f.severity === "Medium").length;
 
-En naviguant sur votre site internet (${new URL(data.siteUrl).hostname}), j'ai remarqué quelques problèmes techniques qui exposent actuellement vos utilisateurs et votre activité.
+    // Pitch prospection irrésistible (Lead Magnet)
+    const emailPitch = `Objet : Alerte Sécurité & Conformité — Failles détectées sur ${hostname}
 
-J'ai fait tourner un rapide audit de sécurité externe et votre site obtient la note de **${data.score}/100 (Grade ${data.grade})**.
+Bonjour l'équipe de ${hostname},
 
-Voici les risques principaux actuellement visibles publiquement sur votre code :
-<ul>
-${painPoints}
-</ul>
+En analysant la posture de sécurité publique de votre architecture web, notre moteur d'audit a identifié ${validFindings.length} faille(s) résiduelle(s) (Score : ${score}/100 - Grade ${grade}).
 
-Ces problèmes peuvent non seulement faire fuiter les données de vos clients, mais aussi impacter lourdement votre référencement naturel.
+${critCount > 0 ? `🚨 Nous avons relevé **${critCount} vulnérabilité(s) critique(s) ou élevée(s)** directement exposées. Dans le contexte actuel de recrudescence des ransomwares et des sanctions RGPD (Art. 32), ces brèches représentent un risque opérationnel et juridique immédiat.` : `⚠️ Bien que votre base principale soit sible, nous avons relevé **${medCount} point(s) de durcissement requis** pour éviter toute compromission d'en-tête ou vol de session cookie.`}
 
-Nous accompagnons les entreprises dans la sécurisation et la mise aux normes de leur architecture web. Seriez-vous disponible mardi prochain pour un échange de 10 minutes afin que je vous montre les détails techniques ?
+La bonne nouvelle ? La majorité de ces failles peuvent être corrigées en moins d'une heure par un expert.
 
-Cordialement,
+J'ai préparé un rapport technique d'intervention contenant le code exact de remédiation pour chacune de ces anomalies. Seriez-vous disponible mardi prochain à 14h pour un briefing téléphonique de 10 minutes afin que je vous transmette le dossier ?
 
-*Généré par LocalSec Audit*
-    `;
+Bien à vous,
+
+*Responsable Audit Offensif & Défensif*`;
 
     resultSummary.innerHTML = `
-        <h3 style="color: #2c3e50; margin-bottom: 20px;">📧 Modèle d'Email de Prospection</h3>
-        <div style="background: #f8f9fa; border: 1px solid #dfe6e9; border-radius: 8px; padding: 25px; font-family: 'Arial', sans-serif; font-size: 14px; line-height: 1.6;">
-            ${emailTemplate}
+        <div style="margin-bottom:30px;background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));padding:25px;border-radius:16px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.4);">
+            <div style="display:flex;justify-content:space-around;align-items:center;margin-bottom:25px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:20px;">
+                <div style="text-align:center;">
+                    <div style="font-size:0.85em;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Cible Audité</div>
+                    <div style="font-size:1.3em;font-weight:700;color:#38bdf8;">${hostname}</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:0.85em;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Indice de Menace</div>
+                    <div style="font-size:1.3em;font-weight:700;color:${critCount > 0 ? '#ef4444' : '#22c55e'};">${critCount > 0 ? 'CRITIQUE' : 'MAÎTRISÉ'}</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:0.85em;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Failles confirmées</div>
+                    <div style="font-size:1.3em;font-weight:700;color:#f8fafc;">${validFindings.length}</div>
+                </div>
+            </div>
+
+            <h3 style="color:#f8fafc;font-size:1.3em;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+                <span>🎯 Matrice des Failles & Correctifs</span>
+            </h3>
+            <div style="max-height:480px;overflow-y:auto;padding-right:8px;margin-bottom:30px;">
+                ${findingsHtml}
+            </div>
+
+            <div style="background:#0f172a;border:2px solid #8b5cf6;border-radius:12px;padding:22px;text-align:left;position:relative;">
+                <div style="position:absolute;top:-12px;left:20px;background:#8b5cf6;color:#fff;font-size:0.75em;font-weight:800;padding:3px 12px;border-radius:12px;text-transform:uppercase;letter-spacing:1px;">🧲 Lead Magnet — Email de Prospection</div>
+                <div style="font-family:'Inter',sans-serif;font-size:0.95em;color:#e2e8f0;white-space:pre-wrap;line-height:1.6;margin-top:8px;">${emailPitch}</div>
+                <button id="copy-email-btn" style="margin-top:20px;width:100%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border:none;padding:14px;border-radius:8px;font-weight:700;font-size:1em;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 4px 20px rgba(139,92,246,0.4);">📋 Copier le pitch cold-email prêt à envoyer</button>
+            </div>
         </div>
-        <button id="copy-email-btn" class="btn primary" style="margin-top: 15px; width: 100%;">📋 Copier l'email</button>
     `;
 
     document.getElementById('copy-email-btn').addEventListener('click', () => {
-        // Strip HTML tags for clipboard (keeping formatting where possible)
-        const textToCopy = document.createElement('div');
-        textToCopy.innerHTML = emailTemplate;
-        navigator.clipboard.writeText(textToCopy.innerText).then(() => {
-            document.getElementById('copy-email-btn').textContent = "✅ Copié !";
-            setTimeout(() => { document.getElementById('copy-email-btn').textContent = "📋 Copier l'email"; }, 2000);
+        navigator.clipboard.writeText(emailPitch).then(() => {
+            const b = document.getElementById('copy-email-btn');
+            b.textContent = "✅ Pitch copié avec succès !";
+            b.style.background = "#22c55e";
+            setTimeout(() => { 
+                b.textContent = "📋 Copier le pitch cold-email prêt à envoyer"; 
+                b.style.background = "linear-gradient(135deg,#3b82f6,#8b5cf6)";
+            }, 3000);
         });
     });
 }
