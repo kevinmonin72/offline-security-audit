@@ -154,10 +154,21 @@ function renderSalesEmailView(data) {
     const validFindings = findings.filter(f => {
         const id = (f.id || "").toUpperCase();
         const ev = (f.evidence || "").toLowerCase();
-        // Élimine les faux positifs connus (ex: AWS documentation dummy keys, variables d'exemple)
         if (id.includes("AKIAIOSFODNN7EXAMPLE") || ev.includes("akiaiosfodnn7example")) return false;
         if (ev.includes("placeholder") || ev.includes("example.com")) return false;
-        return true;
+        
+        const sev = f.severity || f.riskLevel || "Info";
+        if (sev === "Info" || sev === "Low") return false;
+        if (sev === "Critical" || sev === "High") return true;
+        if (sev === "Medium") {
+            const cat = (f.category || f.type || "").toLowerCase();
+            const tit = (f.title || f.service || "").toLowerCase();
+            if (id.includes("CSP") || id.includes("FRAME") || id.includes("SESSION") || cat.includes("publicité") || cat.includes("advertising") || cat.includes("tag manager") || cat.includes("marketing") || cat.includes("session replay") || tit.includes("google tag manager") || tit.includes("pixel") || tit.includes("hubspot") || tit.includes("hotjar") || tit.includes("criteo")) {
+                return true;
+            }
+            return false;
+        }
+        return false;
     });
 
     // Tri par criticité (Critical > High > Medium > Low > Info)
