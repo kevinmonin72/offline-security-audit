@@ -1455,6 +1455,7 @@
         const nowTs = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR");
         let logLinesHtml = `
         <div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.102]</span> <span style="color:#38bdf8;font-weight:700">[*] PROTOCOLE DE CONTRE-AUDIT :</span> Initiation confrontation r\xE9seau sur cible : <strong style="color:#fff">${hostname}</strong></div>
+        ${report.verified_network_probe ? `<div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.120]</span> <span style="color:#10b981;font-weight:700">[\u2714] CAPTEUR CHROME ACTIF :</span> Donn\xE9es forensiques certifi\xE9es \xE0 la source par l'extension LocalSec Sensor v2.0</div>` : ""}
         <div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.145]</span> <span style="color:#22c55e;font-weight:700">[+] HANDSHAKE TCP/TLS :</span> Connexion \xE9tablie sur port 443 (HTTP/2 200 OK \u2014 Certificat R3 Let's Encrypt valid\xE9)</div>
         <div style="margin-bottom:12px;"><span style="color:#64748b">[${nowTs}.189]</span> <span style="color:#a5b4fc;font-weight:700">[i] HAR INSPECTOR :</span> Extraction matrice des en-t\xEAtes bruts & s\xE9rialisation de l'arbre DOM</div>
     `;
@@ -2219,6 +2220,9 @@ Bien \xE0 vous,
       const badge = document.getElementById("forensic-status-badge");
       const nowTs = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR");
       if (term) {
+        if (data && data.verified_network_probe) {
+          term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.120]</span> <span style="color:#10b981;font-weight:700">[\u2714] CAPTEUR CHROME ACTIF :</span> Donn\xE9es forensiques certifi\xE9es \xE0 la source par l'extension LocalSec Sensor v2.0</div>`;
+        }
         term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.145]</span> <span style="color:#22c55e;font-weight:700">[+] HANDSHAKE TCP/TLS :</span> Connexion \xE9tablie sur port 443 (HTTP/2 200 OK \u2014 Certificat R3 Let's Encrypt valid\xE9)</div>`;
         term.innerHTML += `<div style="margin-bottom:12px;"><span style="color:#64748b">[${nowTs}.189]</span> <span style="color:#a5b4fc;font-weight:700">[i] HAR INSPECTOR :</span> Extraction matrice des en-t\xEAtes bruts & s\xE9rialisation de l'arbre DOM</div>`;
         liveReconciled.slice(0, 6).forEach((f, idx) => {

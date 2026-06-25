@@ -368,6 +368,9 @@ Bien à vous,
         const badge = document.getElementById('forensic-status-badge');
         const nowTs = new Date().toLocaleTimeString('fr-FR');
         if (term) {
+            if (data && data.verified_network_probe) {
+                term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.120]</span> <span style="color:#10b981;font-weight:700">[✔] CAPTEUR CHROME ACTIF :</span> Données forensiques certifiées à la source par l'extension LocalSec Sensor v2.0</div>`;
+            }
             term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.145]</span> <span style="color:#22c55e;font-weight:700">[+] HANDSHAKE TCP/TLS :</span> Connexion établie sur port 443 (HTTP/2 200 OK — Certificat R3 Let's Encrypt validé)</div>`;
             term.innerHTML += `<div style="margin-bottom:12px;"><span style="color:#64748b">[${nowTs}.189]</span> <span style="color:#a5b4fc;font-weight:700">[i] HAR INSPECTOR :</span> Extraction matrice des en-têtes bruts & sérialisation de l'arbre DOM</div>`;
             
