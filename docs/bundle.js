@@ -1456,42 +1456,67 @@
         if (validFindings.length === 0) {
           findingsHtml = `<div class="zero-flaws">\u2705 Architecture certifi\xE9e conforme aux standards de s\xE9curit\xE9 2026. Aucune vuln\xE9rabilit\xE9 externe d\xE9tect\xE9e.</div>`;
         } else {
+          const pillars = {
+            access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
+            leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
+            seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
+          };
           validFindings.forEach((f) => {
-            const sev = f.severity || f.riskLevel || "Info";
-            const sCol = sevColors[sev] || "#94a3b8";
-            let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 ou exposition d'en-t\xEAte identifi\xE9.";
-            if (sev === "Critical" || sev === "High") {
-              vulgarised = `\u{1F6A8} <strong>Danger Business Imm\xE9diat :</strong> ${f.description || "Cette br\xE8che permet \xE0 un attaquant d'intercepter des sessions clients, de voler des cookies ou d'injecter du contenu malveillant. Sanctions RGPD encourues (Art. 32)."}`;
-            } else if (sev === "Medium") {
-              vulgarised = `\u26A0\uFE0F <strong>Vuln\xE9rabilit\xE9 SEO & R\xE9putation :</strong> ${f.description || "Absence de directive de durcissement facilitant l'usurpation d'identit\xE9 du site et d\xE9gradant l'indice de confiance Google."}`;
+            const cat = (f.category || "").toLowerCase();
+            const tit = (f.title || "").toLowerCase();
+            const id = (f.id || "").toLowerCase();
+            if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
+              pillars.leak.items.push(f);
+            } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
+              pillars.access.items.push(f);
+            } else {
+              pillars.seo.items.push(f);
             }
-            let techFix = f.recommendation || "Appliquer les directives de durcissement ANSSI.";
-            if (f.category === "Headers" || (f.id || "").includes("HSTS") || (f.id || "").includes("CSP")) {
-              techFix = `Injecter en-t\xEAte HTTP : Content-Security-Policy: default-src 'self'; frame-ancestors 'none' & Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`;
-            } else if (f.category === "Cookies Security" || (f.id || "").includes("COOKIE")) {
-              techFix = `Set-Cookie flags: __Host-SESSIONID=<val>; SameSite=Strict; Secure; HttpOnly; Partitioned`;
-            } else if ((f.id || "").includes("CVE")) {
-              techFix = `Bump package semver: npm install --save-exact ${f.category ? f.category.toLowerCase() : "package"}@latest && rebuild bundle via CI/CD`;
-            } else if ((f.category || "").includes("Secret") || (f.id || "").includes("SECRET")) {
-              techFix = `Revoke token via vendor IAM API -> Rotate KMS secret -> Purge git history via bfg --replace-text`;
-            }
+          });
+          Object.keys(pillars).forEach((k) => {
+            const p = pillars[k];
+            if (p.items.length === 0) return;
             findingsHtml += `
-            <div class="finding-card" style="border-left-color: ${sCol}">
-                <div class="finding-head">
-                    <span class="finding-title">${f.title || "Vuln\xE9rabilit\xE9 D\xE9tect\xE9e"}</span>
-                    <span class="sev-badge" style="background: ${sCol}20; color: ${sCol}; border-color: ${sCol}60">${sev}</span>
+            <div style="margin:45px 0 25px 0;background:rgba(15,23,42,0.8);border:2px solid ${p.color};border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,0.4);">
+                <div style="display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:16px;margin-bottom:18px;flex-wrap:wrap;">
+                    <h3 style="font-size:1.25rem;font-weight:800;color:#fff;margin:0;">${p.title} (${p.items.length})</h3>
+                    <span style="font-size:0.85rem;color:#cbd5e1;background:rgba(255,255,255,0.05);padding:4px 12px;border-radius:20px;">${p.desc}</span>
                 </div>
-                <div class="finding-vulgarised">
-                    ${vulgarised}
+                <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:14px;border-radius:8px;margin-bottom:24px;text-align:left;">
+                    <div style="font-size:0.85rem;font-weight:700;color:#f8fafc;margin-bottom:4px;">${p.legal}</div>
+                    <div style="font-size:0.82rem;font-weight:800;color:${p.color};">${p.fine}</div>
                 </div>
-                <div class="tech-fix-box">
-                    <span class="tech-fix-label">\u{1F6E0}\uFE0F REM\xC9DIATION TECHNIQUE BRUTE :</span>
-                    <code>${techFix}</code>
-                </div>
-                <div style="margin-top:14px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:5px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;letter-spacing:0.3px;">
-                    \u26A1 Confirm\xE9 R\xE9el par Contre-V\xE9rification Active Serveur
-                </div>
-            </div>`;
+            `;
+            p.items.forEach((f) => {
+              const sev = f.severity || f.riskLevel || "Info";
+              const sCol = sevColors[sev] || "#94a3b8";
+              let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 ou exposition d'en-t\xEAte identifi\xE9.";
+              if (sev === "Critical" || sev === "High") {
+                vulgarised = `\u{1F6A8} <strong>Danger Business Imm\xE9diat :</strong> ${f.description || "Cette br\xE8che permet \xE0 un attaquant d'intercepter des sessions clients ou d'aspirer des donn\xE9es prot\xE9g\xE9es. Exposition CNIL directe."}`;
+              }
+              let techFix = f.recommendation || "Appliquer les directives de durcissement ANSSI.";
+              if (f.category === "Headers" || (f.id || "").includes("HSTS") || (f.id || "").includes("CSP")) {
+                techFix = `Injecter en-t\xEAte HTTP : Content-Security-Policy: default-src 'self'; frame-ancestors 'none' & Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`;
+              } else if (f.category === "Cookies Security" || (f.id || "").includes("COOKIE")) {
+                techFix = `Set-Cookie flags: __Host-SESSIONID=<val>; SameSite=Strict; Secure; HttpOnly; Partitioned`;
+              }
+              findingsHtml += `
+                <div class="finding-card" style="border-left-color: ${sCol};background:#1e293b;">
+                    <div class="finding-head">
+                        <span class="finding-title">${f.title || "Vuln\xE9rabilit\xE9 D\xE9tect\xE9e"}</span>
+                        <span class="sev-badge" style="background: ${sCol}20; color: ${sCol}; border-color: ${sCol}60">${sev}</span>
+                    </div>
+                    <div class="finding-vulgarised">${vulgarised}</div>
+                    <div class="tech-fix-box">
+                        <span class="tech-fix-label">\u{1F6E0}\uFE0F REM\xC9DIATION TECHNIQUE BRUTE :</span>
+                        <code>${techFix}</code>
+                    </div>
+                    <div style="margin-top:14px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:5px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;">
+                        \u26A1 Certifi\xE9 100% R\xE9el (Contre-V\xE9rification Active Serveur)
+                    </div>
+                </div>`;
+            });
+            findingsHtml += `</div>`;
           });
         }
         const elim = report.eliminatedFindings || [];
@@ -1997,42 +2022,56 @@ Responsable Audit Cyber & Conformit\xE9`;
     if (validFindings.length === 0) {
       findingsHtml = `<div style="padding:20px;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:12px;color:#22c55e;font-weight:600;">\u2705 Architecture certifi\xE9e conforme. Z\xE9ro faille ou exposition d\xE9tect\xE9e.</div>`;
     } else {
+      const pillars = {
+        access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
+        leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
+        seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
+      };
       validFindings.forEach((f) => {
-        const sev = f.severity || f.riskLevel || "Info";
-        const sCol = sevColors[sev] || "#94a3b8";
-        let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9 sur l'architecture web.";
-        if (sev === "Critical" || sev === "High") {
-          vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Cette faille permet potentiellement \xE0 un pirate d'intercepter vos donn\xE9es ou de compromettre votre site."}`;
-        } else if (sev === "Medium") {
-          vulgarised = `\u26A0\uFE0F **Point faible :** ${f.description || "Cette anomalie facilite le travail des pirates et affaiblit la protection globale de vos visiteurs."}`;
+        const cat = (f.category || "").toLowerCase();
+        const tit = (f.title || "").toLowerCase();
+        const id = (f.id || "").toLowerCase();
+        if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
+          pillars.leak.items.push(f);
+        } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
+          pillars.access.items.push(f);
+        } else {
+          pillars.seo.items.push(f);
         }
-        let techFix = f.recommendation || "Appliquer les correctifs de durcissement recommand\xE9s par l'ANSSI.";
-        if (f.category === "Headers") {
-          techFix = `Injecter en-t\xEAte HTTP : \`Content-Security-Policy: default-src 'self'\` & \`Strict-Transport-Security: max-age=31536000; includeSubDomains; preload\`.`;
-        } else if (f.category === "Cookies Security") {
-          techFix = `Set-Cookie flags: \`__Host-SESSIONID=...; SameSite=Strict; Secure; HttpOnly; Partitioned\`.`;
-        } else if ((f.id || "").includes("CVE")) {
-          techFix = `Bump package semver: \`npm install --save-exact ${f.category ? f.category.toLowerCase() : "package"}@latest\` puis rebuild asset bundle via CI/CD.`;
-        } else if ((f.category || "").includes("Secret")) {
-          techFix = `Revoke token via vendor API IAM console \u2192 Rotate KMS secret \u2192 Add path to \`.gitignore\` & purge git cache via \`bfg --replace-text\`.`;
-        }
+      });
+      Object.keys(pillars).forEach((k) => {
+        const p = pillars[k];
+        if (p.items.length === 0) return;
         findingsHtml += `
-            <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:18px;margin-bottom:14px;text-align:left;box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <span style="font-weight:700;color:#f8fafc;font-size:1.05em;">${f.title || "Vulnerability Finding"}</span>
-                    <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:4px 10px;border-radius:20px;font-size:0.75em;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;">${sev}</span>
+            <div style="margin:30px 0 20px 0;background:rgba(15,23,42,0.9);border:2px solid ${p.color};border-radius:16px;padding:20px;text-align:left;">
+                <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">
+                    <h3 style="font-size:1.15em;font-weight:800;color:#fff;margin:0 0 4px 0;">${p.title} (${p.items.length})</h3>
+                    <div style="font-size:0.85em;color:#cbd5e1;">${p.desc}</div>
                 </div>
-                <div style="color:#cbd5e1;font-size:0.92em;margin-bottom:14px;line-height:1.5;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;">
-                    ${vulgarised}
+                <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:12px;border-radius:6px;margin-bottom:18px;">
+                    <div style="font-size:0.82em;font-weight:700;color:#f8fafc;">${p.legal}</div>
+                    <div style="font-size:0.8em;font-weight:800;color:${p.color};margin-top:2px;">${p.fine}</div>
                 </div>
-                <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px 14px;font-family:'Fira Code',monospace;font-size:0.8em;color:#38bdf8;">
-                    <span style="color:#64748b;font-weight:600;display:block;font-size:0.9em;margin-bottom:4px;text-transform:uppercase;">\u{1F6E0}\uFE0F Rem\xE9diation technique directe :</span>
-                    ${techFix}
-                </div>
-                <div style="margin-top:12px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:4px 12px;border-radius:6px;font-size:0.75em;font-weight:700;">
-                    \u26A1 Contre-v\xE9rifi\xE9 R\xE9el en Direct (Comparaison Serveur Active)
-                </div>
-            </div>`;
+            `;
+        p.items.forEach((f) => {
+          const sev = f.severity || f.riskLevel || "Info";
+          const sCol = sevColors[sev] || "#94a3b8";
+          let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9.";
+          if (sev === "Critical" || sev === "High") vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Permet potentiellement l'interception de sessions."}`;
+          let techFix = f.recommendation || "Appliquer directives ANSSI.";
+          if (f.category === "Headers") techFix = `Injecter en-t\xEAte HTTP Content-Security-Policy & Strict-Transport-Security`;
+          findingsHtml += `
+                <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:16px;margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:700;color:#f8fafc;font-size:1em;">${f.title}</span>
+                        <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;">${sev}</span>
+                    </div>
+                    <div style="color:#cbd5e1;font-size:0.9em;margin-bottom:12px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">${vulgarised}</div>
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-family:'Fira Code',monospace;font-size:0.78em;color:#38bdf8;">\u{1F6E0}\uFE0F ${techFix}</div>
+                    <div style="margin-top:10px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:3px 10px;border-radius:6px;font-size:0.72em;font-weight:700;">\u26A1 Contre-v\xE9rifi\xE9 R\xE9el en Direct</div>
+                </div>`;
+        });
+        findingsHtml += `</div>`;
       });
     }
     const hostname = (() => {
@@ -2150,23 +2189,56 @@ Bien \xE0 vous,
         const container = document.querySelector('div[style*="max-height:480px"]');
         if (container) {
           let newHtml = "";
+          const livePillars = {
+            access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
+            leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
+            seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
+          };
           liveReconciled.forEach((f) => {
-            const sev = f.severity || f.riskLevel || "Info";
-            const sCol = sevColors[sev] || "#94a3b8";
-            let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9.";
-            if (sev === "Critical" || sev === "High") vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Permet potentiellement l'interception de sessions."}`;
-            let techFix = f.recommendation || "Appliquer directives ANSSI.";
-            if (f.category === "Headers") techFix = `Injecter en-t\xEAte HTTP Content-Security-Policy & Strict-Transport-Security`;
+            const cat = (f.category || "").toLowerCase();
+            const tit = (f.title || "").toLowerCase();
+            const id = (f.id || "").toLowerCase();
+            if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
+              livePillars.leak.items.push(f);
+            } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
+              livePillars.access.items.push(f);
+            } else {
+              livePillars.seo.items.push(f);
+            }
+          });
+          Object.keys(livePillars).forEach((k) => {
+            const p = livePillars[k];
+            if (p.items.length === 0) return;
             newHtml += `
-                    <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:18px;margin-bottom:14px;text-align:left;box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                            <span style="font-weight:700;color:#f8fafc;font-size:1.05em;">${f.title}</span>
-                            <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:4px 10px;border-radius:20px;font-size:0.75em;font-weight:800;">${sev}</span>
+                    <div style="margin:30px 0 20px 0;background:rgba(15,23,42,0.9);border:2px solid ${p.color};border-radius:16px;padding:20px;text-align:left;">
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">
+                            <h3 style="font-size:1.15em;font-weight:800;color:#fff;margin:0 0 4px 0;">${p.title} (${p.items.length})</h3>
+                            <div style="font-size:0.85em;color:#cbd5e1;">${p.desc}</div>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.92em;margin-bottom:14px;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;">${vulgarised}</div>
-                        <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px 14px;font-family:'Fira Code',monospace;font-size:0.8em;color:#38bdf8;">\u{1F6E0}\uFE0F ${techFix}</div>
-                        <div style="margin-top:12px;display:inline-block;background:#05966925;color:#34d399;border:1px solid #059669;padding:4px 12px;border-radius:6px;font-size:0.75em;font-weight:700;">\u26A1 Certifi\xE9 100% R\xE9el apr\xE8s Confrontation Serveur Live</div>
-                    </div>`;
+                        <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:12px;border-radius:6px;margin-bottom:18px;">
+                            <div style="font-size:0.82em;font-weight:700;color:#f8fafc;">${p.legal}</div>
+                            <div style="font-size:0.8em;font-weight:800;color:${p.color};margin-top:2px;">${p.fine}</div>
+                        </div>
+                    `;
+            p.items.forEach((f) => {
+              const sev = f.severity || f.riskLevel || "Info";
+              const sCol = sevColors[sev] || "#94a3b8";
+              let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9.";
+              if (sev === "Critical" || sev === "High") vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Permet potentiellement l'interception de sessions."}`;
+              let techFix = f.recommendation || "Appliquer directives ANSSI.";
+              if (f.category === "Headers") techFix = `Injecter en-t\xEAte HTTP Content-Security-Policy & Strict-Transport-Security`;
+              newHtml += `
+                        <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:16px;margin-bottom:12px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span style="font-weight:700;color:#f8fafc;font-size:1em;">${f.title}</span>
+                                <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;">${sev}</span>
+                            </div>
+                            <div style="color:#cbd5e1;font-size:0.9em;margin-bottom:12px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">${vulgarised}</div>
+                            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-family:'Fira Code',monospace;font-size:0.78em;color:#38bdf8;">\u{1F6E0}\uFE0F ${techFix}</div>
+                            <div style="margin-top:10px;display:inline-block;background:#05966925;color:#34d399;border:1px solid #059669;padding:3px 10px;border-radius:6px;font-size:0.72em;font-weight:700;">\u26A1 Certifi\xE9 100% R\xE9el (Sondage Live Pass\xE9)</div>
+                        </div>`;
+            });
+            newHtml += `</div>`;
           });
           falsePositivesEliminated.forEach((fp) => {
             newHtml += `
