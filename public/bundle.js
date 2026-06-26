@@ -1402,9 +1402,164 @@
     }
   });
 
+  // lib/vulgarize-findings.js
+  var require_vulgarize_findings = __commonJS({
+    "lib/vulgarize-findings.js"(exports, module) {
+      var SEV_COLORS = { Critical: "#ef4444", High: "#f97316", Medium: "#eab308", Low: "#3b82f6", Info: "#94a3b8" };
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
+        })[c]);
+      }
+      function sevMeta(severity, borderline) {
+        if (borderline) return { label: "Moyenne \u2B06", note: "proche \xE9lev\xE9e", color: "#f59e0b" };
+        switch (severity) {
+          case "Critical":
+            return { label: "Critique", note: "", color: "#ef4444" };
+          case "High":
+            return { label: "\xC9lev\xE9e", note: "", color: "#f97316" };
+          case "Medium":
+            return { label: "Moyenne", note: "", color: "#eab308" };
+          default:
+            return { label: severity || "Info", note: "", color: "#94a3b8" };
+        }
+      }
+      function deriveCategory(f) {
+        const cat = String(f.category || "").toLowerCase();
+        const id = String(f.id || "").toUpperCase();
+        const tit = String(f.title || "").toLowerCase();
+        const tags = (f.tags || []).map((t) => String(t).toLowerCase());
+        if (tags.includes("api-key") || tags.includes("source-code")) return "Fuite de secrets";
+        if (cat.includes("header") || id.includes("HSTS") || id.includes("CSP") || id.includes("X_FRAME") || id.includes("REFERRER") || id.includes("PERMISSIONS") || id.includes("CONTENT_TYPE") || id.includes("XSS_PROTECTION")) return "En-t\xEAtes de s\xE9curit\xE9";
+        if (cat.includes("cookie") || id.includes("COOKIE") || id.includes("SESSION")) return "Cookies & Sessions";
+        if (cat.includes("tls") || cat.includes("ssl") || cat.includes("cleartext") || tags.includes("mixed-content") || tags.includes("password")) return "Chiffrement HTTPS";
+        if (tags.includes("seo") || tags.includes("black-hat")) return "SEO / R\xE9putation";
+        if (tags.includes("localstorage") || tags.includes("tokens")) return "Gestion des jetons";
+        if (tags.includes("email") || tags.includes("privacy") || tit.includes("traceur") || tit.includes("pixel") || tit.includes("cookie")) return "Confidentialit\xE9 / RGPD";
+        return f.category || f.type || "Autre";
+      }
+      function vulgarize(f) {
+        const id = String(f.id || "").toUpperCase();
+        const title = String(f.title || "").toLowerCase();
+        const tags = (f.tags || []).map((t) => String(t).toLowerCase());
+        if (id.includes("API") || tags.includes("api-key")) return "Une cl\xE9 secr\xE8te est visible directement dans le code du site. N'importe qui peut la copier et s'en servir \xE0 vos frais.";
+        if (tags.includes("password") || title.includes("mot de passe")) return "Les mots de passe circulent en clair sur le r\xE9seau : une personne mal intentionn\xE9e peut les intercepter.";
+        if (title.includes("pixel") || title.includes("traceur") || title.includes("hotjar") || title.includes("criteo") || title.includes("hubspot") || title.includes("tag manager")) return "Un traceur publicitaire collecte les donn\xE9es de vos visiteurs. Sans consentement clair, c'est un risque RGPD/CNIL.";
+        if (id.includes("HSTS") || tags.includes("mixed-content") || title.includes("http ")) return "La connexion peut basculer en non-chiffr\xE9 : un pirate sur le m\xEAme Wi-Fi pourrait espionner les \xE9changes.";
+        if (id.includes("CSP")) return "Protection insuffisante contre l'injection de code pi\xE9g\xE9 (vol de donn\xE9es, fausses publicit\xE9s).";
+        if (id.includes("X_FRAME") || id.includes("FRAME")) return "Votre site peut \xEAtre affich\xE9 dans une fausse page pour tromper vos visiteurs (clickjacking).";
+        if (id.includes("CONTENT_TYPE")) return "Le navigateur pourrait ex\xE9cuter un fichier malveillant d\xE9guis\xE9 en simple image.";
+        if (id.includes("REFERRER")) return "L'adresse de vos pages, parfois sensible, peut fuiter vers d'autres sites.";
+        if (id.includes("PERMISSIONS")) return "Cam\xE9ra, micro et g\xE9olocalisation ne sont pas explicitement bloqu\xE9s pour les scripts.";
+        if (id.includes("XSS_PROTECTION")) return "Une ancienne protection du navigateur, aujourd'hui obsol\xE8te et risqu\xE9e, est rest\xE9e active.";
+        if (id.includes("HTTPONLY")) return "Un script malveillant peut lire ce cookie et voler la session de l'utilisateur.";
+        if (id.includes("SECURE")) return "L'identifiant de connexion peut circuler en clair et \xEAtre intercept\xE9.";
+        if (id.includes("SAMESITE") || id.includes("SESSION")) return "Le site est plus expos\xE9 aux actions forc\xE9es \xE0 l'insu de l'utilisateur (attaque CSRF).";
+        if (tags.includes("seo") || tags.includes("black-hat")) return "Des liens cach\xE9s polluent votre r\xE9f\xE9rencement Google \u2014 souvent le signe d'un piratage.";
+        if (tags.includes("email")) return "Vos adresses e-mail sont visibles et peuvent \xEAtre aspir\xE9es par des robots spammeurs.";
+        if (tags.includes("comments")) return "Des notes internes de d\xE9veloppeurs tra\xEEnent dans le code source, lisibles par tous.";
+        if (tags.includes("localstorage") || tags.includes("tokens")) return "Des jetons de s\xE9curit\xE9 sont stock\xE9s d'une fa\xE7on vuln\xE9rable au vol par un script.";
+        return f.description || "\xC9cart de s\xE9curit\xE9 \xE0 corriger pour durcir votre site.";
+      }
+      function techFix(f) {
+        const id = String(f.id || "").toUpperCase();
+        const cat = String(f.category || "");
+        if (cat.includes("Headers") || cat.includes("Security Headers") || id.includes("HSTS") || id.includes("CSP") || id.includes("X_FRAME") || id.includes("CONTENT_TYPE") || id.includes("REFERRER") || id.includes("PERMISSIONS") || id.includes("XSS_PROTECTION")) {
+          return "Content-Security-Policy: default-src 'self'; frame-ancestors 'none'  \u2022  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+        }
+        if (cat.includes("Cookies") || id.includes("COOKIE") || id.includes("SESSION")) {
+          return "Set-Cookie: __Host-SESSIONID=<val>; SameSite=Strict; Secure; HttpOnly; Partitioned";
+        }
+        return f.recommendation || "Appliquer les directives de durcissement ANSSI.";
+      }
+      var TH = "background:#0b1220;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;font-size:0.72rem;font-weight:800;text-align:left;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.1);";
+      var TD = "padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;color:#cbd5e1;";
+      function buildFindingsTable2(findings, eliminated) {
+        if (!findings || findings.length === 0) {
+          return `<div style="padding:26px;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:14px;color:#22c55e;font-weight:600;text-align:center;">\u2705 Architecture conforme. Aucune faille critique, \xE9lev\xE9e ou moyenne-haute d\xE9tect\xE9e.</div>`;
+        }
+        let rows = "";
+        findings.forEach((f) => {
+          const sev = f.severity || f.riskLevel || "Info";
+          const borderline = sev === "Medium";
+          const m = sevMeta(sev, borderline);
+          const category = deriveCategory(f);
+          const plain = vulgarize(f);
+          const fix = techFix(f);
+          const rowBg = borderline ? "background:rgba(245,158,11,0.06);" : "";
+          const dash = borderline ? "dashed" : "solid";
+          rows += `
+            <tr style="border-left:5px ${dash} ${m.color};${rowBg}">
+                <td style="${TD}width:120px;white-space:nowrap;">
+                    <span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;border:1px solid ${m.color}66;background:${m.color}1f;color:${m.color};">${escapeHtml(m.label)}</span>
+                    ${m.note ? `<span style="display:block;margin-top:5px;font-size:0.68rem;color:#f59e0b;font-style:italic;">${escapeHtml(m.note)}</span>` : ""}
+                </td>
+                <td style="${TD}width:150px;"><span style="display:inline-block;background:rgba(56,189,248,0.12);color:#38bdf8;padding:4px 10px;border-radius:8px;font-size:0.76rem;font-weight:600;">${escapeHtml(category)}</span></td>
+                <td style="${TD}width:200px;color:#fff;font-weight:600;">${escapeHtml(f.title || "Vuln\xE9rabilit\xE9 d\xE9tect\xE9e")}</td>
+                <td style="${TD}color:#e2e8f0;line-height:1.5;">${escapeHtml(plain)}</td>
+                <td style="${TD}min-width:230px;"><code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:0.78rem;color:#38bdf8;word-break:break-word;white-space:normal;display:block;background:#0f172a;padding:10px;border-radius:8px;border:1px solid #334155;">${escapeHtml(fix)}</code></td>
+            </tr>`;
+        });
+        let html = `
+        <div style="width:100%;overflow-x:auto;border-radius:16px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 10px 25px rgba(0,0,0,0.3);margin-bottom:18px;">
+            <table style="width:100%;min-width:760px;border-collapse:collapse;background:#1e293b;font-size:0.9rem;">
+                <thead>
+                    <tr>
+                        <th style="${TH}">Criticit\xE9</th>
+                        <th style="${TH}">Crit\xE8re</th>
+                        <th style="${TH}">Faille</th>
+                        <th style="${TH}">Ce que \xE7a signifie pour vous</th>
+                        <th style="${TH}">Correctif technique</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:0.8rem;color:#94a3b8;margin-bottom:30px;padding:4px 2px;">
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:12px;height:12px;border-radius:3px;display:inline-block;background:#ef4444;"></span>Critique</span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:12px;height:12px;border-radius:3px;display:inline-block;background:#f97316;"></span>\xC9lev\xE9e</span>
+            <span style="display:inline-flex;align-items:center;gap:7px;"><span style="width:12px;height:12px;border-radius:3px;display:inline-block;background:#f59e0b;border:1px dashed #fbbf24;"></span>Moyenne \u2B06 (proche d'une \xE9lev\xE9e)</span>
+        </div>`;
+        if (eliminated && eliminated.length > 0) {
+          let elimRows = "";
+          eliminated.forEach((fp) => {
+            elimRows += `
+                <tr style="border-left:5px solid #64748b;opacity:0.75;">
+                    <td style="${TD}width:120px;"><span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;background:#64748b30;color:#cbd5e1;">REJET\xC9</span></td>
+                    <td style="${TD}color:#94a3b8;text-decoration:line-through;" colspan="2">${escapeHtml(fp.finding && fp.finding.title ? fp.finding.title : "Anomalie r\xE9concili\xE9e")}</td>
+                    <td style="${TD}color:#4ade80;" colspan="2">\u{1F6E1}\uFE0F ${escapeHtml(fp.reason || "Invalid\xE9 lors du contr\xF4le.")}</td>
+                </tr>`;
+          });
+          html += `
+        <div style="margin:10px 0 8px 0;font-size:1rem;font-weight:700;color:#94a3b8;">\u{1F5D1}\uFE0F Faux positifs \xE9cart\xE9s (${eliminated.length})</div>
+        <div style="width:100%;overflow-x:auto;border-radius:14px;border:1px solid rgba(255,255,255,0.06);margin-bottom:20px;">
+            <table style="width:100%;min-width:600px;border-collapse:collapse;background:#0f172a;font-size:0.85rem;">
+                <tbody>${elimRows}</tbody>
+            </table>
+        </div>`;
+        }
+        return html;
+      }
+      module.exports = {
+        SEV_COLORS,
+        escapeHtml,
+        sevMeta,
+        deriveCategory,
+        vulgarize,
+        techFix,
+        buildFindingsTable: buildFindingsTable2
+      };
+    }
+  });
+
   // lib/render-report.js
   var require_render_report = __commonJS({
     "lib/render-report.js"(exports, module) {
+      var { deriveCategory, buildFindingsTable: buildFindingsTable2 } = require_vulgarize_findings();
       function getGradeColor(grade) {
         switch (grade) {
           case "A":
@@ -1458,133 +1613,16 @@
         validFindings.sort((a, b) => {
           const sa = order[a.severity || a.riskLevel || "Info"] || 6;
           const sb = order[b.severity || b.riskLevel || "Info"] || 6;
-          return sa - sb;
+          if (sa !== sb) return sa - sb;
+          return deriveCategory(a).localeCompare(deriveCategory(b));
         });
         const critCount = validFindings.filter((f) => f.severity === "Critical" || f.severity === "High").length;
         const medCount = validFindings.filter((f) => f.severity === "Medium").length;
-        const sevColors = { "Critical": "#ef4444", "High": "#f97316", "Medium": "#eab308", "Low": "#3b82f6", "Info": "#94a3b8" };
-        const nowTs = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR");
-        let logLinesHtml = `
-        <div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.102]</span> <span style="color:#38bdf8;font-weight:700">[*] PROTOCOLE DE CONTRE-AUDIT :</span> Initiation confrontation r\xE9seau sur cible : <strong style="color:#fff">${hostname}</strong></div>
-        ${report.verified_network_probe ? `<div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.120]</span> <span style="color:#10b981;font-weight:700">[\u2714] CAPTEUR CHROME ACTIF :</span> Donn\xE9es forensiques certifi\xE9es \xE0 la source par l'extension LocalSec Sensor v2.0</div>` : ""}
-        <div style="margin-bottom:6px;"><span style="color:#64748b">[${nowTs}.145]</span> <span style="color:#22c55e;font-weight:700">[+] HANDSHAKE TCP/TLS :</span> Connexion \xE9tablie sur port 443 (HTTP/2 200 OK \u2014 Certificat R3 Let's Encrypt valid\xE9)</div>
-        <div style="margin-bottom:12px;"><span style="color:#64748b">[${nowTs}.189]</span> <span style="color:#a5b4fc;font-weight:700">[i] HAR INSPECTOR :</span> Extraction matrice des en-t\xEAtes bruts & s\xE9rialisation de l'arbre DOM</div>
-    `;
-        validFindings.slice(0, 6).forEach((f, idx) => {
-          const checkNum = String(idx + 1).padStart(2, "0");
-          const ms = String(210 + idx * 34).padStart(3, "0");
-          const catName = (f.category || "Security").toUpperCase();
-          logLinesHtml += `
-        <div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.${ms}]</span> <span style="color:#f59e0b;font-weight:700">[PROBE #${checkNum}]</span> Analyse vecteur <span style="color:#e2e8f0">[${catName}]</span> \u2794 "${(f.title || "").substring(0, 50)}..."</div>
-        <div><span style="color:#64748b">[${nowTs}.${ms}]</span> &nbsp;&nbsp;\u2514\u2500\u2500 <strong style="color:#ef4444">[ANOMALIE CORROBOR\xC9E]</strong> : Exposition confirm\xE9e active en r\xE9seau distant. Hash cryptographique SHA-256 appos\xE9.</div>
-        `;
-        });
-        if (validFindings.length > 6) {
-          logLinesHtml += `<div style="color:#64748b;margin:8px 0;">... (${validFindings.length - 6} autres sondages forensiques ex\xE9cut\xE9s en parall\xE8le sur l'h\xF4te distant) ...</div>`;
-        }
-        logLinesHtml += `
-        <div style="margin-top:12px;border-top:1px dashed #334155;padding-top:10px;"><span style="color:#64748b">[${nowTs}.982]</span> <strong style="color:#10b981">[\u2605 VERDICT FORENSIC CERTIFI\xC9] :</strong> ${validFindings.length}/${validFindings.length} vuln\xE9rabilit\xE9s corrobor\xE9es. 0 faux positif r\xE9siduel. Hash officiel : <code style="color:#38bdf8">SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code></div>
-    `;
-        const forensicTerminalHtml = `
-    <div style="background:#090d16;border:2px solid #1e293b;border-radius:16px;padding:22px;font-family:'Fira Code',monospace;font-size:0.84rem;color:#38bdf8;margin-bottom:35px;box-shadow:0 15px 35px rgba(0,0,0,0.6);text-align:left;">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:14px;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="display:inline-block;width:12px;height:12px;background:#ef4444;border-radius:50%;"></span>
-                <span style="display:inline-block;width:12px;height:12px;background:#eab308;border-radius:50%;"></span>
-                <span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:50%;"></span>
-                <span style="color:#94a3b8;font-weight:800;margin-left:10px;letter-spacing:1px;font-size:0.8rem;">\u{1F6E1}\uFE0F LOCALSEC FORENSIC ENGINE v2.0 \u2014 LIVE NETWORK HAR PROBE</span>
-            </div>
-            <span style="background:#059669;color:#fff;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:800;letter-spacing:0.5px;">\u2705 SONDAGE R\xC9SEAU PASS\xC9 (100% CORROBOR\xC9)</span>
-        </div>
-        <div style="max-height:260px;overflow-y:auto;line-height:1.6;color:#cbd5e1;">
-            ${logLinesHtml}
-        </div>
-    </div>
-    `;
         let findingsHtml = "";
         if (validFindings.length === 0) {
           findingsHtml = `<div class="zero-flaws">\u2705 Architecture certifi\xE9e conforme aux standards de s\xE9curit\xE9 2026. Aucune vuln\xE9rabilit\xE9 externe d\xE9tect\xE9e.</div>`;
         } else {
-          const pillars = {
-            access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
-            leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
-            seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
-          };
-          validFindings.forEach((f) => {
-            const cat = (f.category || "").toLowerCase();
-            const tit = (f.title || "").toLowerCase();
-            const id = (f.id || "").toLowerCase();
-            if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
-              pillars.leak.items.push(f);
-            } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
-              pillars.access.items.push(f);
-            } else {
-              pillars.seo.items.push(f);
-            }
-          });
-          Object.keys(pillars).forEach((k) => {
-            const p = pillars[k];
-            if (p.items.length === 0) return;
-            findingsHtml += `
-            <div style="margin:45px 0 25px 0;background:rgba(15,23,42,0.8);border:2px solid ${p.color};border-radius:20px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,0.4);">
-                <div style="display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:16px;margin-bottom:18px;flex-wrap:wrap;">
-                    <h3 style="font-size:1.25rem;font-weight:800;color:#fff;margin:0;">${p.title} (${p.items.length})</h3>
-                    <span style="font-size:0.85rem;color:#cbd5e1;background:rgba(255,255,255,0.05);padding:4px 12px;border-radius:20px;">${p.desc}</span>
-                </div>
-                <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:14px;border-radius:8px;margin-bottom:24px;text-align:left;">
-                    <div style="font-size:0.85rem;font-weight:700;color:#f8fafc;margin-bottom:4px;">${p.legal}</div>
-                    <div style="font-size:0.82rem;font-weight:800;color:${p.color};">${p.fine}</div>
-                </div>
-            `;
-            p.items.forEach((f) => {
-              const sev = f.severity || f.riskLevel || "Info";
-              const sCol = sevColors[sev] || "#94a3b8";
-              let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 ou exposition d'en-t\xEAte identifi\xE9.";
-              if (sev === "Critical" || sev === "High") {
-                vulgarised = `\u{1F6A8} <strong>Danger Business Imm\xE9diat :</strong> ${f.description || "Cette br\xE8che permet \xE0 un attaquant d'intercepter des sessions clients ou d'aspirer des donn\xE9es prot\xE9g\xE9es. Exposition CNIL directe."}`;
-              }
-              let techFix = f.recommendation || "Appliquer les directives de durcissement ANSSI.";
-              if (f.category === "Headers" || (f.id || "").includes("HSTS") || (f.id || "").includes("CSP")) {
-                techFix = `Injecter en-t\xEAte HTTP : Content-Security-Policy: default-src 'self'; frame-ancestors 'none' & Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`;
-              } else if (f.category === "Cookies Security" || (f.id || "").includes("COOKIE")) {
-                techFix = `Set-Cookie flags: __Host-SESSIONID=<val>; SameSite=Strict; Secure; HttpOnly; Partitioned`;
-              }
-              findingsHtml += `
-                <div class="finding-card" style="border-left-color: ${sCol};background:#1e293b;">
-                    <div class="finding-head">
-                        <span class="finding-title">${f.title || "Vuln\xE9rabilit\xE9 D\xE9tect\xE9e"}</span>
-                        <span class="sev-badge" style="background: ${sCol}20; color: ${sCol}; border-color: ${sCol}60">${sev}</span>
-                    </div>
-                    <div class="finding-vulgarised">${vulgarised}</div>
-                    <div class="tech-fix-box">
-                        <span class="tech-fix-label">\u{1F6E0}\uFE0F REM\xC9DIATION TECHNIQUE BRUTE :</span>
-                        <code>${techFix}</code>
-                    </div>
-                    <div style="margin-top:14px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:5px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;">
-                        \u26A1 Sonde r\xE9seau active corrobor\xE9e \xE0 ${nowTs} \u2014 Sceau cryptographique SHA-256
-                    </div>
-                </div>`;
-            });
-            findingsHtml += `</div>`;
-          });
-        }
-        const elim = report.eliminatedFindings || [];
-        if (elim.length > 0) {
-          findingsHtml += `<div style="margin:40px 0 20px 0;font-size:1.3rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;gap:10px;">
-            <span>\u{1F5D1}\uFE0F Faux Positifs & Correctifs R\xE9cents \xC9limin\xE9s en Direct (${elim.length})</span>
-        </div>`;
-          elim.forEach((fp) => {
-            findingsHtml += `
-            <div class="finding-card" style="border-left-color: #64748b; opacity: 0.75;">
-                <div class="finding-head">
-                    <span class="finding-title" style="text-decoration:line-through;color:#94a3b8">${fp.finding?.title || "Anomalie r\xE9concili\xE9e"}</span>
-                    <span class="sev-badge" style="background: #64748b30; color: #cbd5e1; border-color: #64748b60">REJET\xC9</span>
-                </div>
-                <div style="color:#4ade80;font-size:0.95rem;font-weight:600;background:rgba(0,0,0,0.3);padding:14px;border-radius:8px;">
-                    \u{1F6E1}\uFE0F Preuve de confrontation serveur : ${fp.reason || "Invalid\xE9 lors du crash-test live."}
-                </div>
-            </div>`;
-          });
+          findingsHtml += buildFindingsTable2(validFindings, report.eliminatedFindings || []);
         }
         const emailPitch = `Objet : Alerte S\xE9curit\xE9 & Conformit\xE9 \u2014 Failles d\xE9tect\xE9es sur ${hostname}
 
@@ -1736,67 +1774,6 @@ Responsable Audit Cyber & Conformit\xE9`;
             align-items: center;
             gap: 10px;
         }
-        .finding-card {
-            background: var(--card-bg);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-left: 6px solid #3b82f6;
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
-        }
-        .finding-card:hover {
-            transform: translateY(-2px);
-        }
-        .finding-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-        }
-        .finding-title {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: #fff;
-        }
-        .sev-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: 1px solid;
-        }
-        .finding-vulgarised {
-            color: #cbd5e1;
-            font-size: 0.98rem;
-            margin-bottom: 18px;
-            background: rgba(0,0,0,0.25);
-            padding: 16px;
-            border-radius: 10px;
-        }
-        .tech-fix-box {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            padding: 14px;
-        }
-        .tech-fix-label {
-            display: block;
-            font-size: 0.75rem;
-            color: #64748b;
-            font-weight: 700;
-            margin-bottom: 6px;
-            letter-spacing: 0.5px;
-        }
-        .tech-fix-box code {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 0.85rem;
-            color: #38bdf8;
-            word-break: break-all;
-        }
         .zero-flaws {
             background: rgba(34, 197, 94, 0.1);
             border: 1px solid #22c55e;
@@ -1876,10 +1853,8 @@ Responsable Audit Cyber & Conformit\xE9`;
             </div>
         </div>
 
-        ${forensicTerminalHtml}
-
         <div class="section-title">
-            <span>\u{1F3AF} Matrice des Failles & Correctifs</span>
+            <span>\u{1F3AF} Failles class\xE9es par criticit\xE9 &amp; crit\xE8re</span>
         </div>
 
         ${findingsHtml}
@@ -1915,6 +1890,7 @@ Responsable Audit Cyber & Conformit\xE9`;
   var { buildRecommendations } = require_build_recommendations();
   var { buildExecutiveSummary } = require_build_executive_summary();
   var { renderHtmlReport } = require_render_report();
+  var { buildFindingsTable } = require_vulgarize_findings();
   var dropZone = document.getElementById("drop-zone");
   var fileInput = document.getElementById("file-input");
   var loading = document.getElementById("loading");
@@ -2071,63 +2047,7 @@ Responsable Audit Cyber & Conformit\xE9`;
     scoreBadge.textContent = grade;
     scoreBadge.style.backgroundColor = color;
     scoreBadge.style.boxShadow = `0 0 25px ${color}`;
-    let findingsHtml = "";
-    const sevColors = { "Critical": "#ef4444", "High": "#f97316", "Medium": "#eab308", "Low": "#3b82f6", "Info": "#94a3b8" };
-    if (validFindings.length === 0) {
-      findingsHtml = `<div style="padding:20px;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:12px;color:#22c55e;font-weight:600;">\u2705 Architecture certifi\xE9e conforme. Z\xE9ro faille ou exposition d\xE9tect\xE9e.</div>`;
-    } else {
-      const pillars = {
-        access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
-        leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
-        seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
-      };
-      validFindings.forEach((f) => {
-        const cat = (f.category || "").toLowerCase();
-        const tit = (f.title || "").toLowerCase();
-        const id = (f.id || "").toLowerCase();
-        if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
-          pillars.leak.items.push(f);
-        } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
-          pillars.access.items.push(f);
-        } else {
-          pillars.seo.items.push(f);
-        }
-      });
-      Object.keys(pillars).forEach((k) => {
-        const p = pillars[k];
-        if (p.items.length === 0) return;
-        findingsHtml += `
-            <div style="margin:30px 0 20px 0;background:rgba(15,23,42,0.9);border:2px solid ${p.color};border-radius:16px;padding:20px;text-align:left;">
-                <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">
-                    <h3 style="font-size:1.15em;font-weight:800;color:#fff;margin:0 0 4px 0;">${p.title} (${p.items.length})</h3>
-                    <div style="font-size:0.85em;color:#cbd5e1;">${p.desc}</div>
-                </div>
-                <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:12px;border-radius:6px;margin-bottom:18px;">
-                    <div style="font-size:0.82em;font-weight:700;color:#f8fafc;">${p.legal}</div>
-                    <div style="font-size:0.8em;font-weight:800;color:${p.color};margin-top:2px;">${p.fine}</div>
-                </div>
-            `;
-        p.items.forEach((f) => {
-          const sev = f.severity || f.riskLevel || "Info";
-          const sCol = sevColors[sev] || "#94a3b8";
-          let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9.";
-          if (sev === "Critical" || sev === "High") vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Permet potentiellement l'interception de sessions."}`;
-          let techFix = f.recommendation || "Appliquer directives ANSSI.";
-          if (f.category === "Headers") techFix = `Injecter en-t\xEAte HTTP Content-Security-Policy & Strict-Transport-Security`;
-          findingsHtml += `
-                <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:16px;margin-bottom:12px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <span style="font-weight:700;color:#f8fafc;font-size:1em;">${f.title}</span>
-                        <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;">${sev}</span>
-                    </div>
-                    <div style="color:#cbd5e1;font-size:0.9em;margin-bottom:12px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">${vulgarised}</div>
-                    <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-family:'Fira Code',monospace;font-size:0.78em;color:#38bdf8;">\u{1F6E0}\uFE0F ${techFix}</div>
-                    <div style="margin-top:10px;display:inline-block;background:#0284c725;color:#38bdf8;border:1px solid #0284c7;padding:3px 10px;border-radius:6px;font-size:0.72em;font-weight:700;">\u26A1 Sonde r\xE9seau active corrobor\xE9e \u2014 Sceau SHA-256</div>
-                </div>`;
-        });
-        findingsHtml += `</div>`;
-      });
-    }
+    const findingsHtml = buildFindingsTable(validFindings, []);
     const hostname = (() => {
       try {
         return new URL(data.siteUrl).hostname;
@@ -2152,22 +2072,7 @@ J'ai pr\xE9par\xE9 un rapport technique d'intervention contenant le code exact d
 Bien \xE0 vous,
 
 *Responsable Audit Offensif & D\xE9fensif*`;
-    const startTs = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR");
     resultSummary.innerHTML = `
-        <div id="forensic-live-terminal" style="background:#090d16;border:2px solid #1e293b;border-radius:16px;padding:22px;font-family:'Fira Code',monospace;font-size:0.84rem;color:#38bdf8;margin-bottom:35px;box-shadow:0 15px 35px rgba(0,0,0,0.6);text-align:left;">
-            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:14px;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="display:inline-block;width:12px;height:12px;background:#ef4444;border-radius:50%;"></span>
-                    <span style="display:inline-block;width:12px;height:12px;background:#eab308;border-radius:50%;"></span>
-                    <span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:50%;"></span>
-                    <span style="color:#94a3b8;font-weight:800;margin-left:10px;letter-spacing:1px;font-size:0.8rem;">\u{1F6E1}\uFE0F LOCALSEC FORENSIC ENGINE v2.0 \u2014 LIVE NETWORK HAR PROBE</span>
-                </div>
-                <span id="forensic-status-badge" style="background:#0284c7;color:#fff;padding:3px 12px;border-radius:12px;font-size:0.75rem;font-weight:800;letter-spacing:0.5px;">\u26A1 SONDAGE EN COURS...</span>
-            </div>
-            <div id="forensic-log-lines" style="max-height:260px;overflow-y:auto;line-height:1.6;color:#cbd5e1;">
-                <div><span style="color:#64748b">[${startTs}.102]</span> <span style="color:#38bdf8;font-weight:700">[*] PROTOCOLE DE CONTRE-AUDIT :</span> Initiation de la confrontation r\xE9seau sur cible : <strong style="color:#fff">${hostname}</strong></div>
-            </div>
-        </div>
         <div style="margin-bottom:30px;background:linear-gradient(135deg,rgba(30,41,59,0.9),rgba(15,23,42,0.9));padding:25px;border-radius:16px;border:1px solid rgba(255,255,255,0.1);box-shadow:0 10px 30px rgba(0,0,0,0.4);">
             <div style="display:flex;justify-content:space-around;align-items:center;margin-bottom:25px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:20px;">
                 <div style="text-align:center;">
@@ -2185,7 +2090,7 @@ Bien \xE0 vous,
             </div>
 
             <h3 style="color:#f8fafc;font-size:1.3em;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
-                <span>\u{1F3AF} Matrice des Failles & Correctifs</span>
+                <span>\u{1F3AF} Failles class\xE9es par criticit\xE9 &amp; crit\xE8re</span>
             </h3>
             <div style="max-height:480px;overflow-y:auto;padding-right:8px;margin-bottom:30px;">
                 ${findingsHtml}
@@ -2238,102 +2143,10 @@ Bien \xE0 vous,
         }
       } catch (e) {
       }
-      const term = document.getElementById("forensic-log-lines");
-      const badge = document.getElementById("forensic-status-badge");
-      const nowTs = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR");
-      if (term) {
-        if (data && data.verified_network_probe) {
-          term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.120]</span> <span style="color:#10b981;font-weight:700">[\u2714] CAPTEUR CHROME ACTIF :</span> Donn\xE9es forensiques certifi\xE9es \xE0 la source par l'extension LocalSec Sensor v2.0</div>`;
-        }
-        term.innerHTML += `<div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.145]</span> <span style="color:#22c55e;font-weight:700">[+] HANDSHAKE TCP/TLS :</span> Connexion \xE9tablie sur port 443 (HTTP/2 200 OK \u2014 Certificat R3 Let's Encrypt valid\xE9)</div>`;
-        term.innerHTML += `<div style="margin-bottom:12px;"><span style="color:#64748b">[${nowTs}.189]</span> <span style="color:#a5b4fc;font-weight:700">[i] HAR INSPECTOR :</span> Extraction matrice des en-t\xEAtes bruts & s\xE9rialisation de l'arbre DOM</div>`;
-        liveReconciled.slice(0, 6).forEach((f, idx) => {
-          const checkNum = String(idx + 1).padStart(2, "0");
-          const ms = String(210 + idx * 34).padStart(3, "0");
-          const catName = (f.category || "Security").toUpperCase();
-          term.innerHTML += `
-                <div style="margin-top:6px;"><span style="color:#64748b">[${nowTs}.${ms}]</span> <span style="color:#f59e0b;font-weight:700">[PROBE #${checkNum}]</span> Analyse vecteur <span style="color:#e2e8f0">[${catName}]</span> \u2794 "${(f.title || "").substring(0, 50)}..."</div>
-                <div><span style="color:#64748b">[${nowTs}.${ms}]</span> &nbsp;&nbsp;\u2514\u2500\u2500 <strong style="color:#ef4444">[ANOMALIE CORROBOR\xC9E]</strong> : Exposition confirm\xE9e active en r\xE9seau distant. Hash cryptographique SHA-256 appos\xE9.</div>
-                `;
-        });
-        if (liveReconciled.length > 6) {
-          term.innerHTML += `<div style="color:#64748b;margin:8px 0;">... (${liveReconciled.length - 6} autres sondages forensiques ex\xE9cut\xE9s en parall\xE8le sur l'h\xF4te distant) ...</div>`;
-        }
-        term.innerHTML += `
-            <div style="margin-top:12px;border-top:1px dashed #334155;padding-top:10px;"><span style="color:#64748b">[${nowTs}.982]</span> <strong style="color:#10b981">[\u2605 VERDICT FORENSIC CERTIFI\xC9] :</strong> ${liveReconciled.length}/${validFindings.length} vuln\xE9rabilit\xE9s corrobor\xE9es. ${falsePositivesEliminated.length} faux positif(s) rejet\xE9(s). Hash officiel : <code style="color:#38bdf8">SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code></div>
-            `;
-        term.scrollTop = term.scrollHeight;
-      }
-      if (badge) {
-        badge.style.background = "#059669";
-        badge.textContent = "\u2705 SONDAGE R\xC9SEAU PASS\xC9 (100% CORROBOR\xC9)";
-      }
       if (falsePositivesEliminated.length > 0 || liveReconciled.length !== validFindings.length) {
         const container = document.querySelector('div[style*="max-height:480px"]');
         if (container) {
-          let newHtml = "";
-          const livePillars = {
-            access: { title: "\u{1F510} S\xC9CURIT\xC9 DES ACC\xC8S & INTRUSION SERVEUR", desc: "Risque de compromission du site ou vol de session administrative", legal: "\u2696\uFE0F Cadre L\xE9gal : RGPD Art. 32 (S\xE9curit\xE9 des traitements) & Directive NIS 2", fine: "\u{1F4A5} Sanction CNIL / P\xE9nale officielle : Jusqu'\xE0 10 M\u20AC ou 2% du CA mondial + 5 ans d'emprisonnement (Art. 226-17 CP)", color: "#ef4444", items: [] },
-            leak: { title: "\u{1F441}\uFE0F FUITE DE DONN\xC9ES & TRACEURS TIERS ILL\xC9GAUX", desc: "Interception de donn\xE9es personnelles clients ou cookies publicitaires non consentis", legal: "\u2696\uFE0F Cadre L\xE9gal : Directive ePrivacy Art. 5(3) & RGPD Art. 5, 6 et 82", fine: "\u{1F4A5} Sanction CNIL officielle : Jusqu'\xE0 20 M\u20AC ou 4% du CA mondial (Amendes records CNIL cookies)", color: "#f97316", items: [] },
-            seo: { title: "\u26A0\uFE0F R\xC9PUTATION NUM\xC9RIQUE, PHISHING & D\xC9GRADATION SEO", desc: "Absence de bouclier anti-clonage et p\xE9nalit\xE9 de confiance Google Safe Browsing", legal: "\u{1F4C9} Risque Business & Moteur de recherche : Blacklistage Google et perte organique", fine: "\u{1F4A5} Sanction Algorithmique : D\xE9classement SEO B2B et usurpation de nom de domaine", color: "#eab308", items: [] }
-          };
-          liveReconciled.forEach((f) => {
-            const cat = (f.category || "").toLowerCase();
-            const tit = (f.title || "").toLowerCase();
-            const id = (f.id || "").toLowerCase();
-            if (cat.includes("cookie") || tit.includes("cookie") || tit.includes("traceur") || tit.includes("pii") || tit.includes("form") || tit.includes("fuite") || tit.includes("leak") || tit.includes("email") || tit.includes("password")) {
-              livePillars.leak.items.push(f);
-            } else if (cat.includes("tls") || cat.includes("ssl") || tit.includes("cve") || tit.includes("admin") || tit.includes("auth") || tit.includes("injection") || id.includes("csp")) {
-              livePillars.access.items.push(f);
-            } else {
-              livePillars.seo.items.push(f);
-            }
-          });
-          Object.keys(livePillars).forEach((k) => {
-            const p = livePillars[k];
-            if (p.items.length === 0) return;
-            newHtml += `
-                    <div style="margin:30px 0 20px 0;background:rgba(15,23,42,0.9);border:2px solid ${p.color};border-radius:16px;padding:20px;text-align:left;">
-                        <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:14px;">
-                            <h3 style="font-size:1.15em;font-weight:800;color:#fff;margin:0 0 4px 0;">${p.title} (${p.items.length})</h3>
-                            <div style="font-size:0.85em;color:#cbd5e1;">${p.desc}</div>
-                        </div>
-                        <div style="background:${p.color}15;border-left:4px solid ${p.color};padding:12px;border-radius:6px;margin-bottom:18px;">
-                            <div style="font-size:0.82em;font-weight:700;color:#f8fafc;">${p.legal}</div>
-                            <div style="font-size:0.8em;font-weight:800;color:${p.color};margin-top:2px;">${p.fine}</div>
-                        </div>
-                    `;
-            p.items.forEach((f) => {
-              const sev = f.severity || f.riskLevel || "Info";
-              const sCol = sevColors[sev] || "#94a3b8";
-              let vulgarised = f.description || "\xC9cart de s\xE9curit\xE9 identifi\xE9.";
-              if (sev === "Critical" || sev === "High") vulgarised = `\u{1F6A8} **Danger imm\xE9diat :** ${f.description || "Permet potentiellement l'interception de sessions."}`;
-              let techFix = f.recommendation || "Appliquer directives ANSSI.";
-              if (f.category === "Headers") techFix = `Injecter en-t\xEAte HTTP Content-Security-Policy & Strict-Transport-Security`;
-              newHtml += `
-                        <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-left:5px solid ${sCol};border-radius:12px;padding:16px;margin-bottom:12px;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <span style="font-weight:700;color:#f8fafc;font-size:1em;">${f.title}</span>
-                                <span style="background:${sCol}25;color:${sCol};border:1px solid ${sCol}60;padding:3px 10px;border-radius:20px;font-size:0.72em;font-weight:800;">${sev}</span>
-                            </div>
-                            <div style="color:#cbd5e1;font-size:0.9em;margin-bottom:12px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">${vulgarised}</div>
-                            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;font-family:'Fira Code',monospace;font-size:0.78em;color:#38bdf8;">\u{1F6E0}\uFE0F ${techFix}</div>
-                            <div style="margin-top:10px;display:inline-block;background:#05966925;color:#34d399;border:1px solid #059669;padding:3px 10px;border-radius:6px;font-size:0.72em;font-weight:700;">\u26A1 Sonde r\xE9seau active corrobor\xE9e \u2014 Sceau SHA-256</div>
-                        </div>`;
-            });
-            newHtml += `</div>`;
-          });
-          falsePositivesEliminated.forEach((fp) => {
-            newHtml += `
-                    <div style="background:#0f172a;border:1px solid #334155;border-left:5px solid #64748b;border-radius:12px;padding:16px;margin-bottom:14px;text-align:left;opacity:0.8;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <span style="font-weight:700;color:#94a3b8;text-decoration:line-through;font-size:1em;">${fp.finding.title}</span>
-                            <span style="background:#64748b30;color:#cbd5e1;padding:3px 8px;border-radius:12px;font-size:0.7em;font-weight:800;">FAUX POSITIF REJET\xC9</span>
-                        </div>
-                        <div style="color:#34d399;font-size:0.88em;font-weight:600;">\u{1F6E1}\uFE0F Preuve d'invalidation en direct : ${fp.reason}</div>
-                    </div>`;
-          });
-          container.innerHTML = newHtml;
+          container.innerHTML = buildFindingsTable(liveReconciled, falsePositivesEliminated);
         }
         const countBoxes = document.querySelectorAll('div[style*="font-size:1.3em;font-weight:700"]');
         if (countBoxes.length >= 3) {
